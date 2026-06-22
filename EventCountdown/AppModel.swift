@@ -1,0 +1,108 @@
+import Foundation
+import Observation
+
+@Observable
+final class AppModel {
+    let calendarService: CalendarService
+    let emojiStore: EmojiMappingStore
+    let ackStore: AcknowledgmentStore
+    let notificationService: NotificationService
+    let launchAtLoginService: LaunchAtLoginService
+
+    var hasSeenFirstRunHint: Bool {
+        didSet { UserDefaults.standard.set(hasSeenFirstRunHint, forKey: AppConstants.firstRunKey) }
+    }
+
+    init() {
+        ackStore = AcknowledgmentStore()
+        emojiStore = EmojiMappingStore()
+        notificationService = NotificationService(ackStore: ackStore)
+        launchAtLoginService = LaunchAtLoginService()
+        hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
+
+        let ack = ackStore
+        calendarService = CalendarService(pendingKeysProvider: {
+            if let key = ack.primaryPendingRecord?.key.storageKey {
+                return [key]
+            }
+            return []
+        })
+    }
+
+    private var didBootstrap = false
+
+    @MainActor
+    func bootstrap() async {
+        guard !didBootstrap else { return }
+        didBootstrap = true
+        calendarService.start()
+        notificationService.start()
+        if calendarService.authorizationState == .notDetermined {
+            await calendarService.requestAccess()
+        } else {
+            await calendarService.refresh()
+        }
+        await notificationService.restoreOnLaunch(events: calendarService.upcomingEvents) { [emojiStore] event in
+            emojiStore.emoji(for: event)
+        }
+        await resyncNotifications()
+        startTickLoop()
+    }
+
+    @MainActor
+    func resyncNotifications() async {
+        await notificationService.scheduleUpcoming(events: calendarService.scheduleEvents) { [emojiStore] event in
+            emojiStore.emoji(for: event)
+        }
+    }
+
+    @MainActor
+    func acknowledge(_ key: EventKey) async {
+        await notificationService.acknowledge(key)
+        await calendarService.refresh()
+        await resyncNotifications()
+        await notificationService.handleTick(events: calendarService.upcomingEvents) { event in
+            emoji(for: event)
+        }
+    }
+
+    func emoji(for event: CalendarEvent) -> String {
+        emojiStore.emoji(for: event)
+    }
+
+    var nextCountdownEvent: CalendarEvent? {
+        let now = Date()
+        return calendarService.upcomingEvents.first { $0.startDate > now }
+    }
+
+    var primaryPendingAcknowledgmentEvent: CalendarEvent? {
+        guard let record = ackStore.primaryPendingRecord else { return nil }
+        return calendarService.upcomingEvents.first { $0.eventKey.matches(snapshot: record.key) }
+            ?? CalendarEvent(from: record.key)
+    }
+
+    /// Menu bar shows the one event needing acknowledgment, otherwise the next upcoming event.
+    var menuBarEvent: CalendarEvent? {
+        primaryPendingAcknowledgmentEvent ?? nextCountdownEvent
+    }
+
+    var hasPendingAcknowledgment: Bool {
+        ackStore.primaryPendingRecord != nil
+    }
+
+    /// Bumped every second so the menu bar label refreshes without TimelineView.
+    private(set) var tick = Date()
+
+    @MainActor
+    private func startTickLoop() {
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.tick = Date()
+                await self.notificationService.handleTick(events: self.calendarService.upcomingEvents) { event in
+                    self.emoji(for: event)
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,24 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Code coverage
+*.profraw
