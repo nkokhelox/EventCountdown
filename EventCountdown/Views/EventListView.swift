@@ -12,7 +12,10 @@ private struct ScrollContentHeightKey: PreferenceKey {
 struct EventListView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.dismiss) private var dismiss
     @State private var measuredScrollContentHeight: CGFloat = 0
+    @State private var expandedEventIDs: Set<String> = []
+    @State private var collapsedDayIDs: Set<Date> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -25,7 +28,20 @@ struct EventListView: View {
             footer
         }
         .frame(width: MenuBarPanelMetrics.panelWidth)
-        .frame(maxHeight: MenuBarPanelMetrics.maxPanelHeight())
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxHeight: MenuBarPanelMetrics.maxPanelHeight(), alignment: .top)
+    }
+
+    private var maxScrollAreaHeight: CGFloat {
+        MenuBarPanelMetrics.maxPanelHeight() - nonScrollChromeHeight
+    }
+
+    private var needsScroll: Bool {
+        measuredScrollContentHeight > maxScrollAreaHeight && measuredScrollContentHeight > 0
+    }
+
+    private var allDaysCollapsed: Bool {
+        !groupedPanelEvents.isEmpty && groupedPanelEvents.allSatisfy { collapsedDayIDs.contains($0.day) }
     }
 
     private var nonScrollChromeHeight: CGFloat {
@@ -34,32 +50,18 @@ struct EventListView: View {
         return height
     }
 
-    private var maxScrollAreaHeight: CGFloat {
-        max(80, MenuBarPanelMetrics.maxPanelHeight() - nonScrollChromeHeight)
-    }
-
-    private var scrollAreaHeight: CGFloat? {
-        guard measuredScrollContentHeight > 0 else { return nil }
-        return min(measuredScrollContentHeight, maxScrollAreaHeight)
-    }
-
     @ViewBuilder
     private var content: some View {
         switch appModel.calendarService.authorizationState {
         case .authorized:
             Group {
-                if let scrollAreaHeight {
+                if needsScroll {
                     ScrollView {
                         eventsContent
-                            .background(scrollHeightReader)
                     }
-                    .frame(height: scrollAreaHeight)
+                    .frame(height: maxScrollAreaHeight)
                 } else {
-                    ScrollView {
-                        eventsContent
-                            .background(scrollHeightReader)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+                    eventsContent
                 }
             }
             .onPreferenceChange(ScrollContentHeightKey.self) { measuredScrollContentHeight = $0 }
@@ -81,20 +83,22 @@ struct EventListView: View {
 
     @ViewBuilder
     private var eventsContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
             if let pending = appModel.ackStore.primaryPendingRecord {
                 pendingSection(pending)
             }
+            upcomingHeader
             if appModel.calendarService.panelEvents.isEmpty {
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
-                    .padding()
             } else {
-                upcomingSection
+                upcomingEventsList
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, allDaysCollapsed ? 6 : 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(scrollHeightReader)
     }
 
     private var firstRunHint: some View {
@@ -130,17 +134,36 @@ struct EventListView: View {
         }
     }
 
-    private var upcomingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var upcomingHeader: some View {
+        HStack {
             Text("Upcoming")
                 .font(.headline)
+            Spacer()
+            Button {
+                appModel.calendarService.openCalendarToToday()
+            } label: {
+                Image(systemName: "calendar")
+            }
+            .buttonStyle(.borderless)
+            .help("Open Calendar to today")
+            .accessibilityLabel("Open Calendar to today")
+        }
+    }
+
+    private var upcomingEventsList: some View {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(groupedPanelEvents) { group in
-                dayDivider(group.day)
-                ForEach(group.events) { event in
-                    eventRow(event)
-                }
+                daySection(group)
             }
         }
+    }
+
+    private var panelEventsSpanMultipleYears: Bool {
+        let calendar = Calendar.current
+        let years = Set(appModel.calendarService.panelEvents.map {
+            calendar.component(.year, from: $0.startDate)
+        })
+        return years.count > 1
     }
 
     private var groupedPanelEvents: [DayEventGroup] {
@@ -160,16 +183,62 @@ struct EventListView: View {
         return order.map { DayEventGroup(day: $0, events: groups[$0]!) }
     }
 
-    private func dayDivider(_ day: Date) -> some View {
-        HStack(spacing: 8) {
-            Text(dayDividerLabel(day))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Rectangle()
-                .fill(Color.secondary.opacity(0.25))
-                .frame(height: 1)
+    private func daySection(_ group: DayEventGroup) -> some View {
+        let isCollapsed = collapsedDayIDs.contains(group.day)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                toggleDayCollapse(group.day)
+            } label: {
+                daySectionHeader(group: group, isCollapsed: isCollapsed)
+            }
+            .buttonStyle(.plain)
+
+            if !isCollapsed {
+                ForEach(group.events) { event in
+                    eventRow(event)
+                }
+            }
         }
-        .padding(.top, 6)
+    }
+
+    private func daySectionHeader(group: DayEventGroup, isCollapsed: Bool) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(spacing: 6) {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+
+                Text(daySectionTitle(group))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if isCollapsed, let earliest = group.earliestEvent {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.25))
+                        .frame(height: 1)
+
+                    Text(shortCountdown(for: earliest.startDate, now: context.date))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.25))
+                        .frame(height: 1)
+                }
+            }
+        }
+        .padding(.vertical, isCollapsed ? 2 : 4)
+        .contentShape(Rectangle())
+    }
+
+    private func daySectionTitle(_ group: DayEventGroup) -> String {
+        let count = group.events.count
+        let eventWord = count == 1 ? "event" : "events"
+        return "\(dayDividerLabel(group.day)) (\(count) \(eventWord))"
     }
 
     private func dayDividerLabel(_ day: Date) -> String {
@@ -177,28 +246,105 @@ struct EventListView: View {
         if calendar.isDateInToday(day) { return "Today" }
         if calendar.isDateInTomorrow(day) { return "Tomorrow" }
         let formatter = DateFormatter()
-        formatter.dateStyle = .full
         formatter.timeStyle = .none
+        if panelEventsSpanMultipleYears {
+            formatter.dateStyle = .full
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("EEEEMMMd")
+        }
         return formatter.string(from: day)
     }
 
     private func eventRow(_ event: CalendarEvent) -> some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 10) {
-                Circle().fill(event.calendarColor).frame(width: 8, height: 8)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appModel.labeledTitle(for: event))
-                    Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
+        let isExpanded = expandedEventIDs.contains(event.id)
+
+        return TimelineView(.periodic(from: .now, by: 1)) { context in
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    toggleEventExpansion(event.id)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 10)
+
+                        Circle().fill(event.calendarColor).frame(width: 8, height: 8)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appModel.labeledTitle(for: event))
+                            Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+
+                        Text(shortCountdown(for: event.startDate, now: context.date))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
-                Spacer()
-                Text(
-                    CountdownFormatter.format(
-                        remaining: CountdownFormatter.remaining(until: event.startDate, now: context.date)
-                    ).listText
-                )
+                .buttonStyle(.plain)
+
+                if isExpanded {
+                    expandedEventDetails(event, now: context.date)
+                }
+            }
+            .modifier(EventRowHoverHighlight())
+        }
+    }
+
+    private func expandedEventDetails(_ event: CalendarEvent, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(fullCountdown(for: event.startDate, now: now))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                Button("Open in Calendar") {
+                    appModel.calendarService.openCalendar(to: event.startDate)
+                }
+                .buttonStyle(.link)
+
+                if let callLink = event.callLink {
+                    Button {
+                        NSWorkspace.shared.open(callLink)
+                    } label: {
+                        Label("Join Call", systemImage: "video.fill")
+                    }
+                    .buttonStyle(.link)
+                }
             }
+        }
+        .padding(.leading, 28)
+        .padding(.bottom, 6)
+    }
+
+    private func shortCountdown(for date: Date, now: Date) -> String {
+        CountdownFormatter.format(
+            remaining: CountdownFormatter.remaining(until: date, now: now)
+        ).listText
+    }
+
+    private func fullCountdown(for date: Date, now: Date) -> String {
+        CountdownFormatter.fullRemainingListText(
+            remaining: CountdownFormatter.remaining(until: date, now: now)
+        )
+    }
+
+    private func toggleDayCollapse(_ day: Date) {
+        if collapsedDayIDs.contains(day) {
+            collapsedDayIDs.remove(day)
+        } else {
+            collapsedDayIDs.insert(day)
+        }
+    }
+
+    private func toggleEventExpansion(_ eventID: String) {
+        if expandedEventIDs.contains(eventID) {
+            expandedEventIDs.remove(eventID)
+        } else {
+            expandedEventIDs.insert(eventID)
         }
     }
 
@@ -217,7 +363,7 @@ struct EventListView: View {
 
     private var footer: some View {
         HStack {
-            Button { openSettings() } label: {
+            Button { showSettingsInForeground() } label: {
                 Image(systemName: "gearshape")
             }
             .help("Settings")
@@ -229,10 +375,20 @@ struct EventListView: View {
         .padding(10)
     }
 
+    private func showSettingsInForeground() {
+        dismiss()
+        if let delegate = NSApp.delegate as? AppDelegate {
+            delegate.showSettings { openSettings() }
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
+    }
+
     private func formattedStart(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
+        let dateTemplate = panelEventsSpanMultipleYears ? "yMMMd" : "MMMd"
+        formatter.setLocalizedDateFormatFromTemplate("\(dateTemplate)jm")
         return formatter.string(from: date)
     }
 }
@@ -242,4 +398,24 @@ private struct DayEventGroup: Identifiable {
     let events: [CalendarEvent]
 
     var id: Date { day }
+
+    var earliestEvent: CalendarEvent? {
+        events.min(by: { $0.startDate < $1.startDate })
+    }
+}
+
+private struct EventRowHoverHighlight: ViewModifier {
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .onHover { isHovered = $0 }
+    }
 }

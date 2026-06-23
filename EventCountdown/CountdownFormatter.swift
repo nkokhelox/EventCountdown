@@ -104,4 +104,32 @@ enum CountdownFormatter {
     static func remaining(until date: Date, now: Date = Date()) -> TimeInterval {
         date.timeIntervalSince(now)
     }
+
+    static func fullRemainingListText(remaining interval: TimeInterval) -> String {
+        if interval <= 0 { return "now" }
+
+        var seconds = Int(interval)
+        var parts: [String] = []
+        let units: [(Int, CountdownUnit)] = [
+            (Int(year), .years),
+            (Int(month), .months),
+            (Int(week), .weeks),
+            (Int(day), .days),
+            (Int(hour), .hours),
+            (Int(minute), .minutes),
+        ]
+
+        for (unitSeconds, unit) in units {
+            let count = seconds / unitSeconds
+            if count > 0 {
+                parts.append("\(count) \(unit.fullLabel(for: count))")
+                seconds %= unitSeconds
+            }
+        }
+
+        if parts.isEmpty {
+            return "1 minute"
+        }
+        return parts.joined(separator: " ")
+    }
 }

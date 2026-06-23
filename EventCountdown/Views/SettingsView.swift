@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -9,10 +10,6 @@ struct SettingsView: View {
                 .tabItem { Label("Calendars", systemImage: "calendar") }
             emojiTab
                 .tabItem { Label("Emoji", systemImage: "face.smiling") }
-            notificationsTab
-                .tabItem { Label("Notifications", systemImage: "bell") }
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
             aboutTab
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
@@ -61,50 +58,59 @@ struct SettingsView: View {
             .padding()
     }
 
-    private var notificationsTab: some View {
-        Form {
-            Toggle("Enable notifications", isOn: Binding(
-                get: { appModel.notificationService.isEnabled },
-                set: { appModel.notificationService.isEnabled = $0; Task { await appModel.resyncNotifications() } }
-            ))
-            if !appModel.notificationService.permissionGranted {
-                Text("Notifications are disabled in System Settings.")
-                    .foregroundStyle(.secondary)
-                Button("Open Notification Settings") { openNotificationSettings() }
-            }
-            Text("Pre-scheduled reminders continue even when the app is quit.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            if appModel.notificationService.isEnabled && !appModel.launchAtLoginService.isEnabled {
-                Text("Tip: enable Launch at login for menubar countdown and in-app reminders.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-    }
+    private var aboutTab: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                aboutSettingsGroup(title: "Startup", systemImage: "power") {
+                    Toggle("Run at startup", isOn: Binding(
+                        get: { appModel.launchAtLoginService.isEnabled },
+                        set: { appModel.launchAtLoginService.isEnabled = $0 }
+                    ))
+                    if let message = appModel.launchAtLoginService.statusMessage {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
 
-    private var generalTab: some View {
-        Form {
-            Toggle("Launch at login", isOn: Binding(
-                get: { appModel.launchAtLoginService.isEnabled },
-                set: { appModel.launchAtLoginService.isEnabled = $0 }
-            ))
-            if let message = appModel.launchAtLoginService.statusMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                aboutSettingsGroup(title: "Notifications", systemImage: "bell") {
+                    Toggle("Enable notifications", isOn: Binding(
+                        get: { appModel.notificationService.isEnabled },
+                        set: { appModel.notificationService.isEnabled = $0; Task { await appModel.resyncNotifications() } }
+                    ))
+                    if !appModel.notificationService.permissionGranted {
+                        Text("Notifications are disabled in System Settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Open Notification Settings") { openNotificationSettings() }
+                    }
+                    Text("Pre-scheduled reminders continue even when the app is quit.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if appModel.notificationService.isEnabled && !appModel.launchAtLoginService.isEnabled {
+                        Text("Tip: enable Run at startup for menu bar countdown and in-app reminders.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
+
+            Spacer(minLength: 24)
+
+            aboutDetailsFooter
         }
-        .padding()
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { appModel.launchAtLoginService.syncStatus() }
     }
 
-    private var aboutTab: some View {
-        Form {
+    private var aboutDetailsFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
             Text("EventCountdown")
                 .font(.headline)
             Text("Countdown units use fixed durations: 1 year = 365 days, 1 month = 30 days, 1 week = 7 days. This keeps boundaries consistent but differs from calendar months.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             #if DEBUG && DEBUG_SHORT_ACK_WINDOW
@@ -113,7 +119,32 @@ struct SettingsView: View {
                 .foregroundStyle(.orange)
             #endif
         }
-        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func aboutSettingsGroup<Content: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            }
+        }
     }
 
     private func openNotificationSettings() {

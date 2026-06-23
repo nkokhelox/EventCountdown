@@ -34,7 +34,16 @@ final class CalendarService {
     }
 
     var panelEvents: [CalendarEvent] {
-        Array(upcomingEvents.prefix(AppConstants.scheduleEventCount))
+        let calendar = Calendar.current
+        let now = Date()
+        guard let horizonEnd = calendar.date(
+            byAdding: .day,
+            value: AppConstants.panelHorizonDays,
+            to: calendar.startOfDay(for: now)
+        ) else {
+            return upcomingEvents
+        }
+        return upcomingEvents.filter { $0.startDate < horizonEnd }
     }
 
     var scheduleEvents: [CalendarEvent] {
@@ -81,6 +90,48 @@ final class CalendarService {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    func openCalendarToToday() {
+        openCalendar(to: Date())
+    }
+
+    func openCalendar(to date: Date) {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        guard let year = components.year, let month = components.month, let day = components.day else {
+            openCalendarApp()
+            return
+        }
+        let hour = components.hour ?? 0
+        let minute = components.minute ?? 0
+
+        let scriptSource = """
+        tell application "Calendar"
+            activate
+            set targetDate to current date
+            set year of targetDate to \(year)
+            set month of targetDate to \(month)
+            set day of targetDate to \(day)
+            set hours of targetDate to \(hour)
+            set minutes of targetDate to \(minute)
+            set seconds of targetDate to 0
+            view calendar at targetDate
+        end tell
+        """
+        var error: NSDictionary?
+        if let script = NSAppleScript(source: scriptSource) {
+            script.executeAndReturnError(&error)
+            if error == nil { return }
+        }
+        openCalendarApp()
+    }
+
+    private func openCalendarApp() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else { return }
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration, completionHandler: nil)
     }
 
     @MainActor

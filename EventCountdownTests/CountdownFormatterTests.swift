@@ -78,4 +78,14 @@ final class CountdownFormatterTests: XCTestCase {
         let value = CountdownFormatter.format(remaining: 2 * hour)
         XCTAssertEqual(value.menuBarText, "2hrs")
     }
+
+    func testFullRemainingListTextIncludesHoursAndMinutes() {
+        let text = CountdownFormatter.fullRemainingListText(remaining: 13 * hour + 45 * minute)
+        XCTAssertEqual(text, "13 hours 45 minutes")
+    }
+
+    func testFullRemainingListTextIncludesDaysHoursAndMinutes() {
+        let text = CountdownFormatter.fullRemainingListText(remaining: 2 * day + 3 * hour + 20 * minute)
+        XCTAssertEqual(text, "2 days 3 hours 20 minutes")
+    }
 }
