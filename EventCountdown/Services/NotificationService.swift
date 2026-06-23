@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -22,6 +23,13 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         if response.actionIdentifier == "ACKNOWLEDGE" {
             if let key = userInfo["eventKey"] as? String {
                 onAcknowledge?(key)
+            }
+        } else if response.actionIdentifier == "JOIN_CALL" {
+            if let urlString = userInfo["callURL"] as? String, let url = URL(string: urlString) {
+                NSWorkspace.shared.open(url)
+            }
+            if let key = userInfo["eventKey"] as? String {
+                onDelivered?(key)
             }
         } else {
             handlePayload(userInfo)
@@ -182,8 +190,19 @@ final class NotificationService {
 
     private func registerCategories() async {
         let acknowledge = UNNotificationAction(identifier: "ACKNOWLEDGE", title: "Acknowledge", options: [.foreground])
-        let category = UNNotificationCategory(identifier: "EVENT_STARTED", actions: [acknowledge], intentIdentifiers: [])
-        center.setNotificationCategories([category])
+        let joinCall = UNNotificationAction(
+            identifier: "JOIN_CALL",
+            title: "Join",
+            options: [.foreground],
+            icon: UNNotificationActionIcon(systemImageName: "video.fill")
+        )
+        let withCall = UNNotificationCategory(
+            identifier: "EVENT_STARTED_CALL",
+            actions: [joinCall, acknowledge],
+            intentIdentifiers: []
+        )
+        let withoutCall = UNNotificationCategory(identifier: "EVENT_STARTED", actions: [acknowledge], intentIdentifiers: [])
+        center.setNotificationCategories([withCall, withoutCall])
     }
 
     private func scheduleChain(for event: CalendarEvent, emoji: String) async {
@@ -196,7 +215,7 @@ final class NotificationService {
         var requests: [UNNotificationRequest] = []
 
         let initial = buildContent(for: event, emoji: emoji, isReminder: false)
-        initial.userInfo = payload(for: key, action: "start")
+        initial.userInfo = payload(for: key, action: "start", callURL: event.callLink)
         if start > Date() {
             let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: start), repeats: false)
             requests.append(UNNotificationRequest(identifier: key.notificationID, content: initial, trigger: trigger))
@@ -206,7 +225,7 @@ final class NotificationService {
             let fireDate = start.addingTimeInterval(interval * Double(index))
             guard fireDate <= start.addingTimeInterval(window), fireDate > Date() else { continue }
             let content = buildContent(for: event, emoji: emoji, isReminder: true)
-            content.userInfo = payload(for: key, action: "reminder")
+            content.userInfo = payload(for: key, action: "reminder", callURL: event.callLink)
             let trigger = UNCalendarNotificationTrigger(
                 dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate),
                 repeats: false
@@ -236,7 +255,7 @@ final class NotificationService {
     private func deliverNotification(for event: CalendarEvent, emoji: String, isReminder: Bool) async {
         guard isEnabled else { return }
         let content = buildContent(for: event, emoji: emoji, isReminder: isReminder)
-        content.userInfo = payload(for: event.eventKey, action: isReminder ? "reminder" : "start")
+        content.userInfo = payload(for: event.eventKey, action: isReminder ? "reminder" : "start", callURL: event.callLink)
         let request = UNNotificationRequest(identifier: event.eventKey.notificationID, content: content, trigger: nil)
         try? await center.add(request)
     }
@@ -285,13 +304,13 @@ final class NotificationService {
 
     private func buildContent(for event: CalendarEvent, emoji: String, isReminder: Bool) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = "\(emoji) \(event.title)"
+        content.title = EventTitleEmoji.labeledTitle(fullTitle: event.title, mappedEmoji: emoji)
         content.subtitle = event.calendarTitle
         var bodyParts: [String] = [formattedStart(event)]
         if let location = event.location, !location.isEmpty { bodyParts.append(location) }
         if let notes = event.notes?.split(separator: "\n").first, !notes.isEmpty { bodyParts.append(String(notes)) }
         content.body = bodyParts.joined(separator: " · ")
-        content.categoryIdentifier = "EVENT_STARTED"
+        content.categoryIdentifier = event.callLink == nil ? "EVENT_STARTED" : "EVENT_STARTED_CALL"
         content.sound = isReminder ? nil : .default
         if #available(macOS 12.0, *) {
             content.interruptionLevel = .timeSensitive
@@ -299,8 +318,12 @@ final class NotificationService {
         return content
     }
 
-    private func payload(for key: EventKey, action: String) -> [String: Any] {
-        ["eventKey": key.storageKey, "action": action]
+    private func payload(for key: EventKey, action: String, callURL: URL? = nil) -> [String: Any] {
+        var info: [String: Any] = ["eventKey": key.storageKey, "action": action]
+        if let callURL {
+            info["callURL"] = callURL.absoluteString
+        }
+        return info
     }
 
     private func formattedStart(_ event: CalendarEvent) -> String {

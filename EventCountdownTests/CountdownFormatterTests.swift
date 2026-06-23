@@ -11,18 +11,19 @@ final class CountdownFormatterTests: XCTestCase {
     func testGreaterThanTwoYearsUsesYears() {
         let value = CountdownFormatter.format(remaining: 2 * year + day)
         XCTAssertEqual(value.unit, .years)
-        XCTAssertEqual(value.value, 3)
+        XCTAssertEqual(value.value, 2)
     }
 
     func testExactlyTwoYearsUsesMonths() {
         let value = CountdownFormatter.format(remaining: 2 * year)
         XCTAssertEqual(value.unit, .months)
-        XCTAssertEqual(value.value, 25)
+        XCTAssertEqual(value.value, 24)
     }
 
     func testExactlyThreeMonthsUsesWeeks() {
         let value = CountdownFormatter.format(remaining: 3 * month)
         XCTAssertEqual(value.unit, .weeks)
+        XCTAssertEqual(value.value, 12)
     }
 
     func testExactlyTwoWeeksUsesDays() {
@@ -35,9 +36,22 @@ final class CountdownFormatterTests: XCTestCase {
         XCTAssertEqual(value.unit, .hours)
     }
 
-    func testExactlyTwoHoursUsesMinutes() {
-        let value = CountdownFormatter.format(remaining: 2 * hour)
+    func testExactlyOneHourUsesOneHour() {
+        let value = CountdownFormatter.format(remaining: hour)
+        XCTAssertEqual(value.unit, .hours)
+        XCTAssertEqual(value.value, 1)
+    }
+
+    func testJustUnderOneHourUsesMinutes() {
+        let value = CountdownFormatter.format(remaining: hour - minute)
         XCTAssertEqual(value.unit, .minutes)
+        XCTAssertEqual(value.value, 59)
+    }
+
+    func testOneHourFortyFiveMinutesUsesOneHour() {
+        let value = CountdownFormatter.format(remaining: hour + 45 * minute)
+        XCTAssertEqual(value.unit, .hours)
+        XCTAssertEqual(value.value, 1)
     }
 
     func testExactlyOneMinuteUsesSeconds() {
@@ -48,5 +62,20 @@ final class CountdownFormatterTests: XCTestCase {
     func testZeroOrNegativeIsPast() {
         let value = CountdownFormatter.format(remaining: 0)
         XCTAssertTrue(value.isPast)
+    }
+
+    func testListTextUsesSingularHour() {
+        let value = CountdownFormatter.format(remaining: hour)
+        XCTAssertEqual(value.listText, "1 hour")
+    }
+
+    func testListTextUsesPluralHours() {
+        let value = CountdownFormatter.format(remaining: 2 * hour)
+        XCTAssertEqual(value.listText, "2 hours")
+    }
+
+    func testMenuBarTextUsesCompactPluralHours() {
+        let value = CountdownFormatter.format(remaining: 2 * hour)
+        XCTAssertEqual(value.menuBarText, "2hrs")
     }
 }

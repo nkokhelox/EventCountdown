@@ -81,6 +81,7 @@ private extension CalendarEvent {
         self.isAllDay = false
         self.location = nil
         self.notes = nil
+        self.url = nil
         self.calendarTitle = sample.calendarTitle
         self.calendarID = UUID().uuidString
         self.calendarColor = .accentColor

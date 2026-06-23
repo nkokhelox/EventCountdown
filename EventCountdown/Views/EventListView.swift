@@ -134,10 +134,52 @@ struct EventListView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Upcoming")
                 .font(.headline)
-            ForEach(appModel.calendarService.panelEvents) { event in
-                eventRow(event)
+            ForEach(groupedPanelEvents) { group in
+                dayDivider(group.day)
+                ForEach(group.events) { event in
+                    eventRow(event)
+                }
             }
         }
+    }
+
+    private var groupedPanelEvents: [DayEventGroup] {
+        let calendar = Calendar.current
+        var groups: [Date: [CalendarEvent]] = [:]
+        var order: [Date] = []
+
+        for event in appModel.calendarService.panelEvents {
+            let day = calendar.startOfDay(for: event.startDate)
+            if groups[day] == nil {
+                order.append(day)
+                groups[day] = []
+            }
+            groups[day, default: []].append(event)
+        }
+
+        return order.map { DayEventGroup(day: $0, events: groups[$0]!) }
+    }
+
+    private func dayDivider(_ day: Date) -> some View {
+        HStack(spacing: 8) {
+            Text(dayDividerLabel(day))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Rectangle()
+                .fill(Color.secondary.opacity(0.25))
+                .frame(height: 1)
+        }
+        .padding(.top, 6)
+    }
+
+    private func dayDividerLabel(_ day: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(day) { return "Today" }
+        if calendar.isDateInTomorrow(day) { return "Tomorrow" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .full
+        formatter.timeStyle = .none
+        return formatter.string(from: day)
     }
 
     private func eventRow(_ event: CalendarEvent) -> some View {
@@ -145,7 +187,7 @@ struct EventListView: View {
             HStack(spacing: 10) {
                 Circle().fill(event.calendarColor).frame(width: 8, height: 8)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(appModel.emoji(for: event)) \(event.title)")
+                    Text(appModel.labeledTitle(for: event))
                     Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -176,7 +218,7 @@ struct EventListView: View {
     private var footer: some View {
         HStack {
             Button { openSettings() } label: {
-                Image(nsImage: NSImage(named: NSImage.preferencesGeneralName)!)
+                Image(systemName: "gearshape")
             }
             .help("Settings")
             .accessibilityLabel("Settings")
@@ -193,4 +235,11 @@ struct EventListView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+}
+
+private struct DayEventGroup: Identifiable {
+    let day: Date
+    let events: [CalendarEvent]
+
+    var id: Date { day }
 }

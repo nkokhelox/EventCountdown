@@ -67,7 +67,11 @@ final class AppModel {
     }
 
     func emoji(for event: CalendarEvent) -> String {
-        emojiStore.emoji(for: event)
+        EventTitleEmoji.resolvedEmoji(for: event.title, mappedEmoji: emojiStore.emoji(for: event))
+    }
+
+    func labeledTitle(for event: CalendarEvent) -> String {
+        EventTitleEmoji.labeledTitle(fullTitle: event.title, mappedEmoji: emojiStore.emoji(for: event))
     }
 
     var nextCountdownEvent: CalendarEvent? {

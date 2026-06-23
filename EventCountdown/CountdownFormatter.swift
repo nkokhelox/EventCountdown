@@ -9,15 +9,29 @@ enum CountdownUnit: String, CaseIterable {
     case minutes
     case seconds
 
-    var compactSuffix: String {
+    func fullLabel(for value: Int) -> String {
+        let plural = value != 1
         switch self {
-        case .years: return "yr"
-        case .months: return "mo"
-        case .weeks: return "wk"
+        case .years: return plural ? "years" : "year"
+        case .months: return plural ? "months" : "month"
+        case .weeks: return plural ? "weeks" : "week"
+        case .days: return plural ? "days" : "day"
+        case .hours: return plural ? "hours" : "hour"
+        case .minutes: return plural ? "minutes" : "minute"
+        case .seconds: return plural ? "seconds" : "second"
+        }
+    }
+
+    func compactLabel(for value: Int) -> String {
+        let plural = value != 1
+        switch self {
+        case .years: return plural ? "yrs" : "yr"
+        case .months: return plural ? "mos" : "mo"
+        case .weeks: return plural ? "wks" : "wk"
         case .days: return "d"
-        case .hours: return "hr"
-        case .minutes: return "min"
-        case .seconds: return "sec"
+        case .hours: return plural ? "hrs" : "hr"
+        case .minutes: return plural ? "mins" : "min"
+        case .seconds: return plural ? "secs" : "sec"
         }
     }
 }
@@ -29,13 +43,17 @@ struct CountdownValue: Equatable, Sendable {
 
     var compactText: String {
         if isPast { return "now" }
-        return "\(value)\(unit.compactSuffix)"
+        return "\(value) \(unit.fullLabel(for: value))"
     }
 
     var listText: String {
         if isPast { return "now" }
-        let label = value == 1 ? String(unit.compactSuffix.dropLast()) : unit.compactSuffix
-        return "\(value) \(label)"
+        return "\(value) \(unit.fullLabel(for: value))"
+    }
+
+    var menuBarText: String {
+        if isPast { return "now" }
+        return "\(value)\(unit.compactLabel(for: value))"
     }
 }
 
@@ -50,7 +68,7 @@ enum CountdownFormatter {
     private static let threeMonths = 3 * month
     private static let twoWeeks = 2 * week
     private static let twoDays = 2 * day
-    private static let twoHours = 2 * hour
+    private static let oneHour = hour
     private static let oneMinute = minute
 
     static func format(remaining interval: TimeInterval, now: Date = Date()) -> CountdownValue {
@@ -63,24 +81,24 @@ enum CountdownFormatter {
         }
 
         if interval > twoYears {
-            return CountdownValue(value: max(1, Int(ceil(interval / year))), unit: .years, isPast: false)
+            return CountdownValue(value: max(1, Int(interval / year)), unit: .years, isPast: false)
         }
         if interval > threeMonths {
-            return CountdownValue(value: max(1, Int(ceil(interval / month))), unit: .months, isPast: false)
+            return CountdownValue(value: max(1, Int(interval / month)), unit: .months, isPast: false)
         }
         if interval > twoWeeks {
-            return CountdownValue(value: max(1, Int(ceil(interval / week))), unit: .weeks, isPast: false)
+            return CountdownValue(value: max(1, Int(interval / week)), unit: .weeks, isPast: false)
         }
         if interval > twoDays {
-            return CountdownValue(value: max(1, Int(ceil(interval / day))), unit: .days, isPast: false)
+            return CountdownValue(value: max(1, Int(interval / day)), unit: .days, isPast: false)
         }
-        if interval > twoHours {
-            return CountdownValue(value: max(1, Int(ceil(interval / hour))), unit: .hours, isPast: false)
+        if interval >= oneHour {
+            return CountdownValue(value: max(1, Int(interval / hour)), unit: .hours, isPast: false)
         }
         if interval > oneMinute {
-            return CountdownValue(value: max(1, Int(ceil(interval / minute))), unit: .minutes, isPast: false)
+            return CountdownValue(value: max(1, Int(interval / minute)), unit: .minutes, isPast: false)
         }
-        return CountdownValue(value: max(1, Int(ceil(interval))), unit: .seconds, isPast: false)
+        return CountdownValue(value: max(1, Int(interval)), unit: .seconds, isPast: false)
     }
 
     static func remaining(until date: Date, now: Date = Date()) -> TimeInterval {

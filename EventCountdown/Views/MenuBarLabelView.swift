@@ -23,7 +23,7 @@ struct MenuBarLabelView: View {
             return "! \(emoji) now"
         }
         let remaining = CountdownFormatter.remaining(until: event.startDate, now: appModel.tick)
-        let countdown = CountdownFormatter.format(remaining: remaining).compactText
+        let countdown = CountdownFormatter.format(remaining: remaining).menuBarText
         var text = "\(emoji) \(countdown)"
         if text.count > 28 {
             text = String(text.prefix(28))
