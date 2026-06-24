@@ -8,7 +8,7 @@ struct EmojiRulesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Use exact title for important events. First matching rule wins.")
+            Text("Emoji priority: title emoji, then first matching rule, then calendar emoji, then app icon. Drag rules to reorder.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

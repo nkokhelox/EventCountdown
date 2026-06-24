@@ -90,7 +90,7 @@ final class AcknowledgmentStore {
     }
 
     func pruneAcknowledgedAndExpired() {
-        records.removeAll { $0.status == .acknowledged || $0.status == .expired || isExpired($0) }
+        records.removeAll { $0.status == .expired || isExpired($0) }
         save()
     }
 

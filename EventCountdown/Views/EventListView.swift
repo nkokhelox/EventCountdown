@@ -17,6 +17,8 @@ struct EventListView: View {
     @State private var expandedEventIDs: Set<String> = []
     @State private var collapsedDayIDs: Set<Date> = []
 
+    private static let defaultExpandedDayCount = 2
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !appModel.hasSeenFirstRunHint {
@@ -24,8 +26,6 @@ struct EventListView: View {
             }
 
             content
-            Divider()
-            footer
         }
         .frame(width: MenuBarPanelMetrics.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
@@ -45,7 +45,7 @@ struct EventListView: View {
     }
 
     private var nonScrollChromeHeight: CGFloat {
-        var height: CGFloat = 39
+        var height: CGFloat = 40
         if !appModel.hasSeenFirstRunHint { height += 46 }
         return height
     }
@@ -54,21 +54,46 @@ struct EventListView: View {
     private var content: some View {
         switch appModel.calendarService.authorizationState {
         case .authorized:
+            eventsPanel
+        case .notDetermined:
+            panelWithFooter {
+                permissionPrompt("Calendar access is required to show countdowns.")
+            }
+        case .denied, .restricted:
+            panelWithFooter {
+                permissionPrompt("Calendar access is denied. Open System Settings to allow access.")
+            }
+        }
+    }
+
+    private var eventsPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
             Group {
                 if needsScroll {
                     ScrollView {
-                        eventsContent
+                        eventsBody
                     }
                     .frame(height: maxScrollAreaHeight)
                 } else {
-                    eventsContent
+                    eventsBody
                 }
             }
             .onPreferenceChange(ScrollContentHeightKey.self) { measuredScrollContentHeight = $0 }
-        case .notDetermined:
-            permissionPrompt("Calendar access is required to show countdowns.")
-        case .denied, .restricted:
-            permissionPrompt("Calendar access is denied. Open System Settings to allow access.")
+
+            Divider()
+            footer
+        }
+        .onAppear(perform: applyDefaultDayCollapse)
+        .onChange(of: eventDays) { _, _ in
+            applyDefaultDayCollapse()
+        }
+    }
+
+    private func panelWithFooter<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+            Divider()
+            footer
         }
     }
 
@@ -82,7 +107,7 @@ struct EventListView: View {
     }
 
     @ViewBuilder
-    private var eventsContent: some View {
+    private var eventsBody: some View {
         VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
             if let pending = appModel.ackStore.primaryPendingRecord {
                 pendingSection(pending)
@@ -96,7 +121,8 @@ struct EventListView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, allDaysCollapsed ? 6 : 8)
+        .padding(.top, allDaysCollapsed ? 6 : 8)
+        .padding(.bottom, allDaysCollapsed ? 4 : 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(scrollHeightReader)
     }
@@ -183,6 +209,14 @@ struct EventListView: View {
         return order.map { DayEventGroup(day: $0, events: groups[$0]!) }
     }
 
+    private var eventDays: [Date] {
+        groupedPanelEvents.map(\.day)
+    }
+
+    private func applyDefaultDayCollapse() {
+        collapsedDayIDs = Set(eventDays.dropFirst(Self.defaultExpandedDayCount))
+    }
+
     private func daySection(_ group: DayEventGroup) -> some View {
         let isCollapsed = collapsedDayIDs.contains(group.day)
 
@@ -264,33 +298,30 @@ struct EventListView: View {
                     toggleEventExpansion(event.id)
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 10)
-
                         Circle().fill(event.calendarColor).frame(width: 8, height: 8)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(appModel.labeledTitle(for: event))
+                            EventTitleLabel(event: event)
                             Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
                         }
 
-                        Spacer()
+                        Spacer(minLength: 8)
 
                         Text(shortCountdown(for: event.startDate, now: context.date))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .modifier(EventRowHoverHighlight())
 
                 if isExpanded {
                     expandedEventDetails(event, now: context.date)
                 }
             }
-            .modifier(EventRowHoverHighlight())
         }
     }
 
@@ -306,17 +337,21 @@ struct EventListView: View {
                 }
                 .buttonStyle(.link)
 
+                Spacer()
+
                 if let callLink = event.callLink {
                     Button {
                         NSWorkspace.shared.open(callLink)
                     } label: {
-                        Label("Join Call", systemImage: "video.fill")
+                        Image(systemName: "video.fill")
                     }
                     .buttonStyle(.link)
+                    .help("Join Call")
+                    .accessibilityLabel("Join Call")
                 }
             }
         }
-        .padding(.leading, 28)
+        .padding(.leading, 18)
         .padding(.bottom, 6)
     }
 
@@ -372,7 +407,9 @@ struct EventListView: View {
             Button("Quit") { NSApplication.shared.terminate(nil) }
         }
         .buttonStyle(.borderless)
-        .padding(10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
     }
 
     private func showSettingsInForeground() {
@@ -401,6 +438,25 @@ private struct DayEventGroup: Identifiable {
 
     var earliestEvent: CalendarEvent? {
         events.min(by: { $0.startDate < $1.startDate })
+    }
+}
+
+private struct EventTitleLabel: View {
+    @Environment(AppModel.self) private var appModel
+    let event: CalendarEvent
+
+    var body: some View {
+        let resolution = appModel.emojiResolution(for: event)
+        let text = appModel.labeledTitle(for: event)
+
+        if resolution.usesAppIcon {
+            HStack(spacing: 4) {
+                AppIconLabelImage(style: .inline)
+                Text(text)
+            }
+        } else {
+            Text(text)
+        }
     }
 }
 

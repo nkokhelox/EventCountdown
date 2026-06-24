@@ -42,8 +42,8 @@ final class AppModel {
         } else {
             await calendarService.refresh()
         }
-        await notificationService.restoreOnLaunch(events: calendarService.upcomingEvents) { [emojiStore] event in
-            emojiStore.emoji(for: event)
+        await notificationService.restoreOnLaunch(events: calendarService.upcomingEvents) { [weak self] event in
+            self?.emojiResolution(for: event) ?? .appIcon
         }
         await resyncNotifications()
         startTickLoop()
@@ -51,27 +51,23 @@ final class AppModel {
 
     @MainActor
     func resyncNotifications() async {
-        await notificationService.scheduleUpcoming(events: calendarService.scheduleEvents) { [emojiStore] event in
-            emojiStore.emoji(for: event)
+        await notificationService.scheduleUpcoming(events: calendarService.scheduleEvents) { [weak self] event in
+            self?.emojiResolution(for: event) ?? .appIcon
         }
     }
 
     @MainActor
     func acknowledge(_ key: EventKey) async {
         await notificationService.acknowledge(key)
-        await calendarService.refresh()
-        await resyncNotifications()
-        await notificationService.handleTick(events: calendarService.upcomingEvents) { event in
-            emoji(for: event)
-        }
+        tick = Date()
     }
 
-    func emoji(for event: CalendarEvent) -> String {
-        EventTitleEmoji.resolvedEmoji(for: event.title, mappedEmoji: emojiStore.emoji(for: event))
+    func emojiResolution(for event: CalendarEvent) -> EventEmojiResolution {
+        EventTitleEmoji.resolve(for: event, ruleEmoji: emojiStore.ruleEmoji(for: event))
     }
 
     func labeledTitle(for event: CalendarEvent) -> String {
-        EventTitleEmoji.labeledTitle(fullTitle: event.title, mappedEmoji: emojiStore.emoji(for: event))
+        EventTitleEmoji.labeledTitle(fullTitle: event.title, resolution: emojiResolution(for: event))
     }
 
     var nextCountdownEvent: CalendarEvent? {
@@ -104,7 +100,7 @@ final class AppModel {
             Task { @MainActor in
                 self.tick = Date()
                 await self.notificationService.handleTick(events: self.calendarService.upcomingEvents) { event in
-                    self.emoji(for: event)
+                    self.emojiResolution(for: event)
                 }
             }
         }

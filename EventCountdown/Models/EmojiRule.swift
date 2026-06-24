@@ -4,6 +4,8 @@ struct EmojiRule: Codable, Identifiable, Hashable, Sendable {
     enum MatchKind: String, Codable, CaseIterable, Identifiable {
         case exactTitle
         case titleContains
+        case titleStartsWith
+        case titleEndsWith
         case calendarName
 
         var id: String { rawValue }
@@ -12,6 +14,8 @@ struct EmojiRule: Codable, Identifiable, Hashable, Sendable {
             switch self {
             case .exactTitle: return "Exact title"
             case .titleContains: return "Title contains"
+            case .titleStartsWith: return "Title starts with"
+            case .titleEndsWith: return "Title ends with"
             case .calendarName: return "Calendar name"
             }
         }
@@ -43,8 +47,22 @@ struct EmojiRule: Codable, Identifiable, Hashable, Sendable {
             return event.title == matchValue
         case .titleContains:
             return event.title.localizedCaseInsensitiveContains(matchValue)
+        case .titleStartsWith:
+            return event.title.localizedCaseInsensitiveHasPrefix(matchValue)
+        case .titleEndsWith:
+            return event.title.localizedCaseInsensitiveHasSuffix(matchValue)
         case .calendarName:
             return event.calendarTitle.localizedCaseInsensitiveContains(matchValue)
         }
+    }
+}
+
+private extension String {
+    func localizedCaseInsensitiveHasPrefix(_ prefix: String) -> Bool {
+        range(of: prefix, options: [.anchored, .caseInsensitive]) != nil
+    }
+
+    func localizedCaseInsensitiveHasSuffix(_ suffix: String) -> Bool {
+        range(of: suffix, options: [.anchored, .backwards, .caseInsensitive]) != nil
     }
 }

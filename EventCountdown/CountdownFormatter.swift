@@ -53,7 +53,7 @@ struct CountdownValue: Equatable, Sendable {
 
     var menuBarText: String {
         if isPast { return "now" }
-        return "\(value)\(unit.compactLabel(for: value))"
+        return "\(value) \(unit.compactLabel(for: value))"
     }
 }
 

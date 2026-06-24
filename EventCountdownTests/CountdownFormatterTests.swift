@@ -76,7 +76,7 @@ final class CountdownFormatterTests: XCTestCase {
 
     func testMenuBarTextUsesCompactPluralHours() {
         let value = CountdownFormatter.format(remaining: 2 * hour)
-        XCTAssertEqual(value.menuBarText, "2hrs")
+        XCTAssertEqual(value.menuBarText, "2 hrs")
     }
 
     func testFullRemainingListTextIncludesHoursAndMinutes() {

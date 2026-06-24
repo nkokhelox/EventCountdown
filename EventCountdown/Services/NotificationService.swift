@@ -80,7 +80,7 @@ final class NotificationService {
         await registerCategories()
     }
 
-    func restoreOnLaunch(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> String) async {
+    func restoreOnLaunch(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         ackStore.normalizePendingToSingle()
         await cleanupOrphans()
         for record in ackStore.records {
@@ -110,7 +110,7 @@ final class NotificationService {
         }
     }
 
-    func scheduleUpcoming(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> String) async {
+    func scheduleUpcoming(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         guard isEnabled else { return }
         let upcoming = events
             .filter { $0.startDate > Date() }
@@ -128,7 +128,7 @@ final class NotificationService {
         }
     }
 
-    func handleTick(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> String) async {
+    func handleTick(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         guard isEnabled else { return }
         let now = Date()
         for event in events where event.startDate <= now {
@@ -139,6 +139,8 @@ final class NotificationService {
                     ackStore.markExpired(key)
                     await removeNotifications(for: key)
                 }
+            } else if ackStore.record(for: key)?.status == .acknowledged {
+                continue
             } else if ackStore.record(for: key) == nil, ackStore.canMarkPending(for: key) {
                 let fired = coordinator.fireIfNeeded(key) {
                     self.ackStore.markPending(key)
@@ -154,7 +156,7 @@ final class NotificationService {
 
     func acknowledge(_ key: EventKey) async {
         ackStore.markAcknowledged(key)
-        coordinator.reset(key)
+        coordinator.markFired(key)
         await removeNotifications(for: key)
         ackStore.pruneAcknowledgedAndExpired()
         ackStore.normalizePendingToSingle()
@@ -205,7 +207,7 @@ final class NotificationService {
         center.setNotificationCategories([withCall, withoutCall])
     }
 
-    private func scheduleChain(for event: CalendarEvent, emoji: String) async {
+    private func scheduleChain(for event: CalendarEvent, emoji: EventEmojiResolution) async {
         let key = event.eventKey
         let start = event.startDate
         let interval = AppConstants.reminderIntervalSeconds
@@ -252,7 +254,7 @@ final class NotificationService {
         }
     }
 
-    private func deliverNotification(for event: CalendarEvent, emoji: String, isReminder: Bool) async {
+    private func deliverNotification(for event: CalendarEvent, emoji: EventEmojiResolution, isReminder: Bool) async {
         guard isEnabled else { return }
         let content = buildContent(for: event, emoji: emoji, isReminder: isReminder)
         content.userInfo = payload(for: event.eventKey, action: isReminder ? "reminder" : "start", callURL: event.callLink)
@@ -260,7 +262,7 @@ final class NotificationService {
         try? await center.add(request)
     }
 
-    private func restorePending(_ key: EventKey, event: CalendarEvent, emoji: String) async {
+    private func restorePending(_ key: EventKey, event: CalendarEvent, emoji: EventEmojiResolution) async {
         await deliverNotification(for: event, emoji: emoji, isReminder: true)
         await scheduleChain(for: event, emoji: emoji)
     }
@@ -302,9 +304,9 @@ final class NotificationService {
         await removeNotifications(for: record.key)
     }
 
-    private func buildContent(for event: CalendarEvent, emoji: String, isReminder: Bool) -> UNMutableNotificationContent {
+    private func buildContent(for event: CalendarEvent, emoji: EventEmojiResolution, isReminder: Bool) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.title = EventTitleEmoji.labeledTitle(fullTitle: event.title, mappedEmoji: emoji)
+        content.title = EventTitleEmoji.labeledTitle(fullTitle: event.title, resolution: emoji)
         content.subtitle = event.calendarTitle
         var bodyParts: [String] = [formattedStart(event)]
         if let location = event.location, !location.isEmpty { bodyParts.append(location) }

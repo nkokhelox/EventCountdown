@@ -4,12 +4,14 @@ import SwiftUI
 struct MenuBarLabelView: View {
     @Environment(AppModel.self) private var appModel
     let event: CalendarEvent?
-    let emoji: String
+    let resolution: EventEmojiResolution
     let needsAcknowledgment: Bool
+
+    private let labelFont = Font.system(size: 13)
 
     var body: some View {
         let _ = appModel.tick
-        Text(labelText)
+        labelContent
             .overlay {
                 MenuBarHoverTooltip {
                     appModel.menuBarEvent?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -17,18 +19,51 @@ struct MenuBarLabelView: View {
             }
     }
 
-    private var labelText: String {
-        guard let event else { return "\(AppConstants.defaultEmoji) —" }
+    @ViewBuilder
+    private var labelContent: some View {
         if needsAcknowledgment {
-            return "! \(emoji) now"
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("!")
+                    .font(labelFont)
+                emojiMark
+                Text("now")
+                    .font(labelFont)
+            }
+        } else if event != nil {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                emojiMark
+                Text(countdownText)
+                    .font(labelFont)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                emojiMark
+                Text("—")
+                    .font(labelFont)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var emojiMark: some View {
+        if resolution.usesAppIcon {
+            AppIconLabelImage(style: .menuBar)
+        } else if let character = resolution.character {
+            Text(character)
+                .font(labelFont)
+        }
+    }
+
+    private var countdownText: String {
+        guard let event else { return "" }
         let remaining = CountdownFormatter.remaining(until: event.startDate, now: appModel.tick)
-        let countdown = CountdownFormatter.format(remaining: remaining).menuBarText
-        var text = "\(emoji) \(countdown)"
-        if text.count > 28 {
-            text = String(text.prefix(28))
+        var countdown = CountdownFormatter.format(remaining: remaining).menuBarText
+        if countdown.count > 24 {
+            countdown = String(countdown.prefix(24))
         }
-        return text
+        return countdown
     }
 }
 

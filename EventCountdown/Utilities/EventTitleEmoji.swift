@@ -1,15 +1,31 @@
 import Foundation
 
 enum EventTitleEmoji {
-    static func resolvedEmoji(for title: String, mappedEmoji: String) -> String {
-        title.leadingEmojiAndRemainder()?.emoji ?? mappedEmoji
+    static func leadingEmoji(in text: String) -> String? {
+        text.leadingEmojiAndRemainder()?.emoji
     }
 
-    static func labeledTitle(fullTitle: String, mappedEmoji: String) -> String {
+    static func resolve(for event: CalendarEvent, ruleEmoji: String?) -> EventEmojiResolution {
+        if let titleEmoji = leadingEmoji(in: event.title) {
+            return EventEmojiResolution(character: titleEmoji)
+        }
+        if let ruleEmoji {
+            return EventEmojiResolution(character: ruleEmoji)
+        }
+        if let calendarEmoji = leadingEmoji(in: event.calendarTitle) {
+            return EventEmojiResolution(character: calendarEmoji)
+        }
+        return .appIcon
+    }
+
+    static func labeledTitle(fullTitle: String, resolution: EventEmojiResolution) -> String {
         if let (emoji, remainder) = fullTitle.leadingEmojiAndRemainder() {
             return remainder.isEmpty ? emoji : "\(emoji) \(remainder)"
         }
-        return "\(mappedEmoji) \(fullTitle)"
+        if resolution.usesAppIcon {
+            return fullTitle
+        }
+        return "\(resolution.character!) \(fullTitle)"
     }
 }
 

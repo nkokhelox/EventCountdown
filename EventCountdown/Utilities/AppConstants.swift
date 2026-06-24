@@ -22,7 +22,6 @@ enum AppConstants {
     static let panelHorizonDays = 7
     static let scheduleEventCount = 20
     static let fetchHorizonYears = 3
-    static let defaultEmoji = "📅"
     static let firstRunKey = "hasSeenFirstRunHint"
     static let launchAtLoginKey = "launchAtLoginEnabled"
     static let notificationsEnabledKey = "notificationsEnabled"

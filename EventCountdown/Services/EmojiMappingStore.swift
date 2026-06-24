@@ -51,11 +51,11 @@ final class EmojiMappingStore {
         save()
     }
 
-    func emoji(for event: CalendarEvent) -> String {
+    func ruleEmoji(for event: CalendarEvent) -> String? {
         for rule in rules.sorted(by: { $0.priority < $1.priority }) where rule.matches(event: event) {
             return rule.emoji
         }
-        return AppConstants.defaultEmoji
+        return nil
     }
 
     func matchingRules(for sampleTitle: String, calendarName: String) -> [EmojiRule] {

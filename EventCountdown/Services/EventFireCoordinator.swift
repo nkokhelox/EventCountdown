@@ -20,6 +20,12 @@ final class EventFireCoordinator {
         return true
     }
 
+    func markFired(_ key: EventKey) {
+        lock.lock()
+        defer { lock.unlock() }
+        firedKeys.insert(key.storageKey)
+    }
+
     func reset(_ key: EventKey) {
         lock.lock()
         defer { lock.unlock() }

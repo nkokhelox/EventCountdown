@@ -33,6 +33,7 @@
 		A10000000000000000000024 /* MenuBarPanelMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* MenuBarPanelMetrics.swift */; };
 		A10000000000000000000025 /* EventTitleEmoji.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* EventTitleEmoji.swift */; };
 		A10000000000000000000026 /* EventCallLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* EventCallLink.swift */; };
+		A10000000000000000000029 /* EventEmojiResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* EventEmojiResolution.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +74,7 @@
 		A20000000000000000000024 /* MenuBarPanelMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPanelMetrics.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* EventTitleEmoji.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTitleEmoji.swift; sourceTree = "<group>"; };
 		A20000000000000000000026 /* EventCallLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCallLink.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* EventEmojiResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEmojiResolution.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -177,6 +179,7 @@
 				A20000000000000000000017 /* EventKey.swift */,
 				A20000000000000000000024 /* MenuBarPanelMetrics.swift */,
 				A20000000000000000000025 /* EventTitleEmoji.swift */,
+				A20000000000000000000029 /* EventEmojiResolution.swift */,
 				A20000000000000000000026 /* EventCallLink.swift */,
 			);
 			path = Utilities;
@@ -283,6 +286,7 @@
 				A10000000000000000000017 /* EventKey.swift in Sources */,
 				A10000000000000000000024 /* MenuBarPanelMetrics.swift in Sources */,
 				A10000000000000000000025 /* EventTitleEmoji.swift in Sources */,
+				A10000000000000000000029 /* EventEmojiResolution.swift in Sources */,
 				A10000000000000000000026 /* EventCallLink.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
