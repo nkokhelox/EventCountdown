@@ -58,6 +58,12 @@ struct CountdownValue: Equatable, Sendable {
 }
 
 enum CountdownFormatter {
+    static func menuBarAcknowledgmentLabel(elapsedSinceStart: TimeInterval) -> String {
+        if elapsedSinceStart < AppConstants.ackNowDisplaySeconds {
+            return "now"
+        }
+        return "Late"
+    }
     private static let year: TimeInterval = 365 * 24 * 60 * 60
     private static let month: TimeInterval = 30 * 24 * 60 * 60
     private static let week: TimeInterval = 7 * 24 * 60 * 60

@@ -96,6 +96,15 @@ final class CalendarService {
         openCalendar(to: Date())
     }
 
+    func openCalendar(for event: CalendarEvent) {
+        guard authorizationState == .authorized,
+              let ekEvent = eventStore.event(withIdentifier: event.eventIdentifier),
+              revealEventInCalendar(ekEvent) else {
+            openCalendar(to: event.startDate)
+            return
+        }
+    }
+
     func openCalendar(to date: Date) {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
@@ -125,6 +134,51 @@ final class CalendarService {
             if error == nil { return }
         }
         openCalendarApp()
+    }
+
+    private func revealEventInCalendar(_ event: EKEvent) -> Bool {
+        guard let eventID = event.eventIdentifier else { return false }
+
+        let escapedID = appleScriptEscaped(eventID)
+        let escapedCalendarTitle = appleScriptEscaped(event.calendar.title)
+        let scriptSource = """
+        tell application "Calendar"
+            activate
+            set targetEvent to missing value
+            try
+                repeat with e in (events of calendar "\(escapedCalendarTitle)")
+                    if uid of e is "\(escapedID)" then
+                        set targetEvent to e
+                        exit repeat
+                    end if
+                end repeat
+            end try
+            if targetEvent is missing value then
+                repeat with c in calendars
+                    repeat with e in (events of c)
+                        if uid of e is "\(escapedID)" then
+                            set targetEvent to e
+                            exit repeat
+                        end if
+                    end repeat
+                    if targetEvent is not missing value then exit repeat
+                end repeat
+            end if
+            if targetEvent is missing value then error "Event not found"
+            view calendar at (start date of targetEvent)
+            show targetEvent
+        end tell
+        """
+        var error: NSDictionary?
+        guard let script = NSAppleScript(source: scriptSource) else { return false }
+        script.executeAndReturnError(&error)
+        return error == nil
+    }
+
+    private func appleScriptEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     private func openCalendarApp() {

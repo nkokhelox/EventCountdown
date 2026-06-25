@@ -40,6 +40,9 @@ final class EmojiMappingStore {
 
     func deleteRule(id: UUID) {
         rules.removeAll { $0.id == id }
+        for index in rules.indices {
+            rules[index].priority = index
+        }
         save()
     }
 

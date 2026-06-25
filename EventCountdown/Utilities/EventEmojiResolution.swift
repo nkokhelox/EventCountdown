@@ -73,24 +73,13 @@ enum AppIconRenderer {
 struct AppIconLabelImage: View {
     enum Style {
         case menuBar
-        case inline
 
-        var pointSize: CGFloat {
-            switch self {
-            case .menuBar: return 30
-            case .inline: return 13
-            }
-        }
+        var pointSize: CGFloat { 2 }
 
-        var baselineOffset: CGFloat {
-            switch self {
-            case .menuBar: return 0.12
-            case .inline: return 0
-            }
-        }
+        var baselineOffset: CGFloat { 0.12 }
     }
 
-    var style: Style = .inline
+    var style: Style = .menuBar
 
     var body: some View {
         if let image = AppIconRenderer.image(pointSize: style.pointSize) {

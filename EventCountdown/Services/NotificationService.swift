@@ -52,8 +52,8 @@ final class NotificationService {
     private let delegate = NotificationDelegate()
     private let coordinator = EventFireCoordinator()
     private let ackStore: AcknowledgmentStore
-    private var supplementTimer: Timer?
-    private var expiryTimer: Timer?
+
+    var onAcknowledged: ((EventKey) async -> Void)?
 
     var isEnabled: Bool {
         didSet { UserDefaults.standard.set(isEnabled, forKey: AppConstants.notificationsEnabledKey) }
@@ -71,7 +71,6 @@ final class NotificationService {
 
     func start() {
         Task { await requestPermission() }
-        startTimers()
     }
 
     func requestPermission() async {
@@ -82,25 +81,14 @@ final class NotificationService {
 
     func restoreOnLaunch(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         ackStore.normalizePendingToSingle()
-        await cleanupOrphans()
         for record in ackStore.records {
             switch record.status {
             case .acknowledged, .expired:
                 await removeNotifications(for: record.key)
             case .pending:
-                guard record.id == ackStore.primaryPendingRecord?.id else {
-                    await removeNotifications(for: record.key)
-                    continue
-                }
                 if ackStore.isExpired(record) {
                     ackStore.markExpired(record.key)
                     await removeNotifications(for: record.key)
-                } else {
-                    await restorePending(
-                        record.key,
-                        event: events.first { $0.eventKey.matches(snapshot: record.key) } ?? CalendarEvent(from: record.key),
-                        emoji: emojiProvider(events.first { $0.eventKey.matches(snapshot: record.key) } ?? CalendarEvent(from: record.key))
-                    )
                 }
             }
         }
@@ -108,50 +96,56 @@ final class NotificationService {
         if isEnabled {
             await scheduleUpcoming(events: events, emojiProvider: emojiProvider)
         }
+        await cleanupOrphans(events: events)
     }
 
     func scheduleUpcoming(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         guard isEnabled else { return }
-        let upcoming = events
-            .filter { $0.startDate > Date() }
-            .prefix(AppConstants.maxReminderChains)
 
-        let keepIDs = Set(upcoming.flatMap { chainIDs(for: $0.eventKey) })
-        let pending = await center.pendingNotificationRequests()
-        let stale = pending
+        let pendingRequests = await center.pendingNotificationRequests()
+        let scheduledIDs = pendingRequests
             .map(\.identifier)
-            .filter { $0.hasPrefix(AppConstants.notificationPrefix) && !keepIDs.contains($0) }
+            .filter { $0.hasPrefix(AppConstants.notificationPrefix) }
+
+        if ackStore.primaryPendingRecord != nil {
+            center.removePendingNotificationRequests(withIdentifiers: scheduledIDs)
+            return
+        }
+
+        guard let nextEvent = nextSchedulableEvent(in: events) else {
+            center.removePendingNotificationRequests(withIdentifiers: scheduledIDs)
+            return
+        }
+
+        let keepID = nextEvent.eventKey.notificationID
+        let stale = scheduledIDs.filter { $0 != keepID }
         center.removePendingNotificationRequests(withIdentifiers: stale)
 
-        for event in upcoming {
-            await scheduleChain(for: event, emoji: emojiProvider(event))
-        }
+        guard !pendingRequests.contains(where: { $0.identifier == keepID }) else { return }
+        await scheduleStartNotification(for: nextEvent, emoji: emojiProvider(nextEvent))
     }
 
     func handleTick(events: [CalendarEvent], emojiProvider: (CalendarEvent) -> EventEmojiResolution) async {
         guard isEnabled else { return }
         let now = Date()
+        var didFire = false
         for event in events where event.startDate <= now {
             let key = event.eventKey
-            let emoji = emojiProvider(event)
             if ackStore.isPending(key) {
-                if let record = ackStore.record(for: key), ackStore.isExpired(record) {
-                    ackStore.markExpired(key)
-                    await removeNotifications(for: key)
-                }
+                continue
             } else if ackStore.record(for: key)?.status == .acknowledged {
                 continue
             } else if ackStore.record(for: key) == nil, ackStore.canMarkPending(for: key) {
                 let fired = coordinator.fireIfNeeded(key) {
                     self.ackStore.markPending(key)
                 }
-                if fired {
-                    await deliverNotification(for: event, emoji: emoji, isReminder: false)
-                    await scheduleChain(for: event, emoji: emoji)
-                }
+                didFire = didFire || fired
             }
         }
-        await processExpiredPending()
+        if didFire {
+            await scheduleUpcoming(events: events, emojiProvider: emojiProvider)
+        }
+        await processExpiredPending(events: events, emojiProvider: emojiProvider)
     }
 
     func acknowledge(_ key: EventKey) async {
@@ -170,7 +164,9 @@ final class NotificationService {
         delegate.onAcknowledge = { [weak self] storageKey in
             guard let self else { return }
             if let record = self.ackStore.records.first(where: { $0.key.storageKey == storageKey }) {
-                Task { await self.acknowledge(record.key) }
+                Task { await self.onAcknowledged?(record.key) }
+            } else if let eventKey = self.eventKey(fromStorageKey: storageKey) {
+                Task { await self.onAcknowledged?(eventKey) }
             }
         }
         delegate.onExpire = { [weak self] storageKey in
@@ -207,85 +203,68 @@ final class NotificationService {
         center.setNotificationCategories([withCall, withoutCall])
     }
 
-    private func scheduleChain(for event: CalendarEvent, emoji: EventEmojiResolution) async {
-        let key = event.eventKey
-        let start = event.startDate
-        let interval = AppConstants.reminderIntervalSeconds
-        let window = AppConstants.ackWindowSeconds
-        let reminderCount = Int(window / interval)
-
-        var requests: [UNNotificationRequest] = []
-
-        let initial = buildContent(for: event, emoji: emoji, isReminder: false)
-        initial.userInfo = payload(for: key, action: "start", callURL: event.callLink)
-        if start > Date() {
-            let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: start), repeats: false)
-            requests.append(UNNotificationRequest(identifier: key.notificationID, content: initial, trigger: trigger))
-        }
-
-        for index in 1...reminderCount {
-            let fireDate = start.addingTimeInterval(interval * Double(index))
-            guard fireDate <= start.addingTimeInterval(window), fireDate > Date() else { continue }
-            let content = buildContent(for: event, emoji: emoji, isReminder: true)
-            content.userInfo = payload(for: key, action: "reminder", callURL: event.callLink)
-            let trigger = UNCalendarNotificationTrigger(
-                dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate),
-                repeats: false
-            )
-            requests.append(UNNotificationRequest(identifier: key.reminderNotificationID(index: index), content: content, trigger: trigger))
-        }
-
-        let expireDate = start.addingTimeInterval(window)
-        if expireDate > Date() {
-            let expireContent = UNMutableNotificationContent()
-            expireContent.title = "Event alert expired"
-            expireContent.body = event.title
-            expireContent.userInfo = payload(for: key, action: "expire")
-            expireContent.sound = nil
-            let trigger = UNCalendarNotificationTrigger(
-                dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: expireDate),
-                repeats: false
-            )
-            requests.append(UNNotificationRequest(identifier: key.expireNotificationID, content: expireContent, trigger: trigger))
-        }
-
-        for request in requests {
-            try? await center.add(request)
-        }
+    private func nextSchedulableEvent(in events: [CalendarEvent]) -> CalendarEvent? {
+        let now = Date()
+        return events
+            .filter { $0.startDate > now }
+            .first { event in
+                let key = event.eventKey
+                guard !coordinator.hasFired(key) else { return false }
+                if ackStore.record(for: key)?.status == .acknowledged { return false }
+                return true
+            }
     }
 
-    private func deliverNotification(for event: CalendarEvent, emoji: EventEmojiResolution, isReminder: Bool) async {
-        guard isEnabled else { return }
-        let content = buildContent(for: event, emoji: emoji, isReminder: isReminder)
-        content.userInfo = payload(for: event.eventKey, action: isReminder ? "reminder" : "start", callURL: event.callLink)
-        let request = UNNotificationRequest(identifier: event.eventKey.notificationID, content: content, trigger: nil)
+    private func scheduleStartNotification(for event: CalendarEvent, emoji: EventEmojiResolution) async {
+        guard event.startDate > Date() else { return }
+
+        let key = event.eventKey
+        let content = buildContent(for: event, emoji: emoji)
+        content.userInfo = payload(for: key, action: "start", callURL: event.callLink)
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second],
+                from: event.startDate
+            ),
+            repeats: false
+        )
+        let request = UNNotificationRequest(identifier: key.notificationID, content: content, trigger: trigger)
         try? await center.add(request)
     }
 
-    private func restorePending(_ key: EventKey, event: CalendarEvent, emoji: EventEmojiResolution) async {
-        await deliverNotification(for: event, emoji: emoji, isReminder: true)
-        await scheduleChain(for: event, emoji: emoji)
-    }
-
     private func removeNotifications(for key: EventKey) async {
-        let ids = chainIDs(for: key)
+        var identifiers = Set(notificationIDs(for: key))
+
+        let pending = await center.pendingNotificationRequests()
+        identifiers.formUnion(
+            pending.map(\.identifier).filter { storageKey(fromNotificationID: $0) == key.storageKey }
+        )
+
+        let delivered = await center.deliveredNotifications()
+        identifiers.formUnion(
+            delivered.map(\.request.identifier).filter { storageKey(fromNotificationID: $0) == key.storageKey }
+        )
+
+        let ids = Array(identifiers)
+        guard !ids.isEmpty else { return }
         center.removePendingNotificationRequests(withIdentifiers: ids)
         center.removeDeliveredNotifications(withIdentifiers: ids)
     }
 
-    private func chainIDs(for key: EventKey) -> [String] {
+    private func notificationIDs(for key: EventKey) -> [String] {
         var ids = [key.notificationID, key.expireNotificationID]
-        let reminderCount = Int(AppConstants.ackWindowSeconds / AppConstants.reminderIntervalSeconds)
-        for index in 1...reminderCount {
+        let legacyReminderCount = Int(AppConstants.ackWindowSeconds / AppConstants.reminderIntervalSeconds)
+        for index in 1...legacyReminderCount {
             ids.append(key.reminderNotificationID(index: index))
         }
         return ids
     }
 
-    private func cleanupOrphans() async {
-        let validKeys = Set(
-            ackStore.primaryPendingRecord.map { [$0.key.storageKey] } ?? []
-        )
+    private func cleanupOrphans(events: [CalendarEvent]) async {
+        var validKeys = Set(ackStore.pendingRecords.map(\.key.storageKey))
+        if ackStore.primaryPendingRecord == nil, let nextEvent = nextSchedulableEvent(in: events) {
+            validKeys.insert(nextEvent.eventKey.storageKey)
+        }
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()
         let allIDs = pending.map(\.identifier) + delivered.map(\.request.identifier)
@@ -298,13 +277,39 @@ final class NotificationService {
         center.removeDeliveredNotifications(withIdentifiers: orphans)
     }
 
-    private func processExpiredPending() async {
-        guard let record = ackStore.primaryPendingRecord, ackStore.isExpired(record) else { return }
-        ackStore.markExpired(record.key)
-        await removeNotifications(for: record.key)
+    private func processExpiredPending(
+        events: [CalendarEvent],
+        emojiProvider: (CalendarEvent) -> EventEmojiResolution
+    ) async {
+        let stalePending = ackStore.records.filter { $0.status == .pending && ackStore.isExpired($0) }
+        guard !stalePending.isEmpty else { return }
+
+        for record in stalePending {
+            ackStore.markExpired(record.key)
+            coordinator.markFired(record.key)
+            await removeNotifications(for: record.key)
+        }
+        ackStore.pruneAcknowledgedAndExpired()
+        ackStore.normalizePendingToSingle()
+        await removeDeliveredAcknowledgmentNotifications()
+        await scheduleUpcoming(events: events, emojiProvider: emojiProvider)
     }
 
-    private func buildContent(for event: CalendarEvent, emoji: EventEmojiResolution, isReminder: Bool) -> UNMutableNotificationContent {
+    /// Clears delivered notifications for events that are no longer pending acknowledgment.
+    private func removeDeliveredAcknowledgmentNotifications() async {
+        let validPendingKeys = Set(ackStore.pendingRecords.map(\.key.storageKey))
+        let delivered = await center.deliveredNotifications()
+        let staleIDs = delivered.compactMap { notification -> String? in
+            let id = notification.request.identifier
+            guard id.hasPrefix(AppConstants.notificationPrefix) else { return nil }
+            guard let storageKey = storageKey(fromNotificationID: id) else { return id }
+            return validPendingKeys.contains(storageKey) ? nil : id
+        }
+        guard !staleIDs.isEmpty else { return }
+        center.removeDeliveredNotifications(withIdentifiers: staleIDs)
+    }
+
+    private func buildContent(for event: CalendarEvent, emoji: EventEmojiResolution) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         content.title = EventTitleEmoji.labeledTitle(fullTitle: event.title, resolution: emoji)
         content.subtitle = event.calendarTitle
@@ -313,7 +318,7 @@ final class NotificationService {
         if let notes = event.notes?.split(separator: "\n").first, !notes.isEmpty { bodyParts.append(String(notes)) }
         content.body = bodyParts.joined(separator: " · ")
         content.categoryIdentifier = event.callLink == nil ? "EVENT_STARTED" : "EVENT_STARTED_CALL"
-        content.sound = isReminder ? nil : .default
+        content.sound = .default
         if #available(macOS 12.0, *) {
             content.interruptionLevel = .timeSensitive
         }
@@ -339,33 +344,23 @@ final class NotificationService {
         let prefix = AppConstants.notificationPrefix
         guard id.hasPrefix(prefix) else { return nil }
         let remainder = String(id.dropFirst(prefix.count))
-        if let range = remainder.range(of: ".reminder.") ?? remainder.range(of: ".expire") {
+        if let range = remainder.range(of: ".reminder.") ?? remainder.range(of: ".expire") ?? remainder.range(of: ".supplement.") {
             let base = String(remainder[..<range.lowerBound])
             return base.replacingOccurrences(of: ".", with: "|")
         }
         return remainder.replacingOccurrences(of: ".", with: "|")
     }
 
-    private func startTimers() {
-        supplementTimer = Timer.scheduledTimer(withTimeInterval: AppConstants.reminderIntervalSeconds, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { await self.supplementRedelivery() }
-        }
-        expiryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { await self.processExpiredPending() }
-        }
-    }
-
-    private func supplementRedelivery() async {
-        guard let record = ackStore.primaryPendingRecord, !ackStore.isExpired(record) else { return }
-        let key = record.key
-        let content = UNMutableNotificationContent()
-        content.title = record.key.title
-        content.body = "Reminder: event started"
-        content.categoryIdentifier = "EVENT_STARTED"
-        content.userInfo = payload(for: key, action: "reminder")
-        let request = UNNotificationRequest(identifier: key.notificationID + ".supplement.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
-        try? await center.add(request)
+    private func eventKey(fromStorageKey storageKey: String) -> EventKey? {
+        guard let separator = storageKey.firstIndex(of: "|") else { return nil }
+        let eventIdentifier = String(storageKey[..<separator])
+        let startString = String(storageKey[storageKey.index(after: separator)...])
+        guard let startInterval = TimeInterval(startString) else { return nil }
+        return EventKey(
+            eventIdentifier: eventIdentifier,
+            startDate: Date(timeIntervalSince1970: startInterval),
+            title: "",
+            calendarID: ""
+        )
     }
 }

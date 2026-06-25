@@ -84,7 +84,10 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         Button("Open Notification Settings") { openNotificationSettings() }
                     }
-                    Text("Pre-scheduled reminders continue even when the app is quit.")
+                    Text("Schedules the next event notification after the current one is acknowledged or expires.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Shows \"now\" for 1 minute after start, then \"Late\" for up to 5 minutes in the menu bar.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if appModel.notificationService.isEnabled && !appModel.launchAtLoginService.isEnabled {
@@ -114,7 +117,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             #if DEBUG && DEBUG_SHORT_ACK_WINDOW
-            Text("DEBUG: acknowledgment window is 5 minutes; reminder interval is 1 minute.")
+            Text("DEBUG: DEBUG_SHORT_ACK_WINDOW is enabled for legacy reminder cleanup constants.")
                 .font(.caption)
                 .foregroundStyle(.orange)
             #endif

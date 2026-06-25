@@ -13,8 +13,12 @@ struct EmojiRulesEditor: View {
                 .foregroundStyle(.secondary)
 
             List {
+                if store.rules.isEmpty {
+                    Text("No emoji rules yet.")
+                        .foregroundStyle(.secondary)
+                }
                 ForEach(store.rules) { rule in
-                    HStack {
+                    HStack(spacing: 10) {
                         Text(rule.emoji)
                         VStack(alignment: .leading) {
                             Text(rule.matchKind.label)
@@ -26,6 +30,14 @@ struct EmojiRulesEditor: View {
                         Text("#\(rule.priority)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                        Button {
+                            store.deleteRule(id: rule.id)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Delete rule")
+                        .accessibilityLabel("Delete rule")
                     }
                 }
                 .onDelete { offsets in

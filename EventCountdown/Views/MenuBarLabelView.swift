@@ -11,7 +11,10 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         let _ = appModel.tick
-        labelContent
+        menuBarLabel
+            .font(labelFont)
+            .monospacedDigit()
+            .lineLimit(1)
             .overlay {
                 MenuBarHoverTooltip {
                     appModel.menuBarEvent?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -19,45 +22,37 @@ struct MenuBarLabelView: View {
             }
     }
 
-    @ViewBuilder
-    private var labelContent: some View {
+    private var menuBarLabel: Text {
+        let mark = menuBarMarkText
+
+        guard let event else {
+            return mark.map { $0 + Text(verbatim: " —") } ?? Text(verbatim: "—")
+        }
+
         if needsAcknowledgment {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text("!")
-                    .font(labelFont)
-                emojiMark
-                Text("now")
-                    .font(labelFont)
-            }
-        } else if event != nil {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                emojiMark
-                Text(countdownText)
-                    .font(labelFont)
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
-        } else {
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                emojiMark
-                Text("—")
-                    .font(labelFont)
-            }
+            return (mark ?? Text(verbatim: "")) + Text(verbatim: " \(acknowledgmentText(for: event))")
         }
+
+        return (mark ?? Text(verbatim: "")) + Text(verbatim: " \(countdownText(for: event))")
     }
 
-    @ViewBuilder
-    private var emojiMark: some View {
-        if resolution.usesAppIcon {
-            AppIconLabelImage(style: .menuBar)
-        } else if let character = resolution.character {
-            Text(character)
-                .font(labelFont)
+    private var menuBarMarkText: Text? {
+        if resolution.usesAppIcon,
+           let image = AppIconRenderer.image(pointSize: AppIconLabelImage.Style.menuBar.pointSize) {
+            return Text(Image(nsImage: image))
         }
+        if let character = resolution.character {
+            return Text(character)
+        }
+        return nil
     }
 
-    private var countdownText: String {
-        guard let event else { return "" }
+    private func acknowledgmentText(for event: CalendarEvent) -> String {
+        let elapsed = appModel.tick.timeIntervalSince(event.startDate)
+        return CountdownFormatter.menuBarAcknowledgmentLabel(elapsedSinceStart: elapsed)
+    }
+
+    private func countdownText(for event: CalendarEvent) -> String {
         let remaining = CountdownFormatter.remaining(until: event.startDate, now: appModel.tick)
         var countdown = CountdownFormatter.format(remaining: remaining).menuBarText
         if countdown.count > 24 {

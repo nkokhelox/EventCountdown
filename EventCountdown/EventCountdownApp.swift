@@ -12,6 +12,7 @@ struct EventCountdownApp: App {
             EventListView()
                 .environment(appModel)
         } label: {
+            let _ = appModel.tick
             MenuBarLabelView(
                 event: appModel.menuBarEvent,
                 resolution: appModel.menuBarEvent.map { appModel.emojiResolution(for: $0) } ?? .appIcon,

@@ -333,7 +333,7 @@ struct EventListView: View {
 
             HStack(spacing: 12) {
                 Button("Open in Calendar") {
-                    appModel.calendarService.openCalendar(to: event.startDate)
+                    appModel.calendarService.openCalendar(for: event)
                 }
                 .buttonStyle(.link)
 
@@ -450,9 +450,10 @@ private struct EventTitleLabel: View {
         let text = appModel.labeledTitle(for: event)
 
         if resolution.usesAppIcon {
-            HStack(spacing: 4) {
-                AppIconLabelImage(style: .inline)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                AppIconLabelImage(style: .menuBar)
                 Text(text)
+                    .font(.body)
             }
         } else {
             Text(text)

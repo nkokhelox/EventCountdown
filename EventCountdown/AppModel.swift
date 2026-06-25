@@ -37,6 +37,9 @@ final class AppModel {
         didBootstrap = true
         calendarService.start()
         notificationService.start()
+        notificationService.onAcknowledged = { [weak self] key in
+            await self?.acknowledge(key)
+        }
         if calendarService.authorizationState == .notDetermined {
             await calendarService.requestAccess()
         } else {
@@ -60,6 +63,7 @@ final class AppModel {
     func acknowledge(_ key: EventKey) async {
         await notificationService.acknowledge(key)
         tick = Date()
+        await resyncNotifications()
     }
 
     func emojiResolution(for event: CalendarEvent) -> EventEmojiResolution {
