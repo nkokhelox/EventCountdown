@@ -59,7 +59,7 @@ struct SettingsView: View {
     }
 
     private var aboutTab: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 aboutSettingsGroup(title: "Startup", systemImage: "power") {
                     Toggle("Run at startup", isOn: Binding(
@@ -83,6 +83,18 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.radioGroup)
                     Text("Choose whether clicking or double-clicking an event opens Calendar to that day.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Picker("Remaining time", selection: Binding(
+                        get: { appModel.countdownRoundsUp },
+                        set: { appModel.countdownRoundsUp = $0 }
+                    )) {
+                        Text("Round down").tag(false)
+                        Text("Round up").tag(true)
+                    }
+                    .pickerStyle(.radioGroup)
+                    Text("Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\".")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -110,13 +122,13 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+
+
+                aboutDetailsFooter
             }
-
-            Spacer(minLength: 24)
-
-            aboutDetailsFooter
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { appModel.launchAtLoginService.syncStatus() }
     }
