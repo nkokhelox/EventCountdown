@@ -25,7 +25,6 @@ final class AcknowledgmentStore {
         records.filter { $0.status == .pending && !isExpired($0) }
     }
 
-    /// Oldest started event still awaiting acknowledgment.
     var primaryPendingRecord: AcknowledgmentRecord? {
         pendingRecords.min { $0.key.startDate < $1.key.startDate }
     }
@@ -47,7 +46,6 @@ final class AcknowledgmentStore {
         normalizePendingToSingle()
     }
 
-    /// Keep at most one pending acknowledgment; drop extras so they can fire again later.
     func normalizePendingToSingle() {
         let pending = pendingRecords.sorted { $0.key.startDate < $1.key.startDate }
         guard pending.count > 1 else { return }
