@@ -22,6 +22,8 @@
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>EventCountdown asks Calendar to open to the date of a selected event.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>EventCountdown reads your upcoming calendar events to show menu bar countdowns and event-time notifications.</string>
 	<key>NSCalendarsUsageDescription</key>

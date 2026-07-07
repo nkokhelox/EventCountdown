@@ -92,16 +92,18 @@ final class CalendarService {
         }
     }
 
-    func openCalendarToToday() {
-        openCalendar(to: Date())
+    func openCalendar(to date: Date) {
+        if navigateCalendarWithAppleScript(to: date) {
+            return
+        }
+        openCalendarApp()
     }
 
-    func openCalendar(to date: Date) {
+    private func navigateCalendarWithAppleScript(to date: Date) -> Bool {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
         guard let year = components.year, let month = components.month, let day = components.day else {
-            openCalendarApp()
-            return
+            return false
         }
         let hour = components.hour ?? 0
         let minute = components.minute ?? 0
@@ -120,11 +122,9 @@ final class CalendarService {
         end tell
         """
         var error: NSDictionary?
-        if let script = NSAppleScript(source: scriptSource) {
-            script.executeAndReturnError(&error)
-            if error == nil { return }
-        }
-        openCalendarApp()
+        guard let script = NSAppleScript(source: scriptSource) else { return false }
+        script.executeAndReturnError(&error)
+        return error == nil
     }
 
     private func openCalendarApp() {
