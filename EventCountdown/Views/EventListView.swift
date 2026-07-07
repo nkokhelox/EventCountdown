@@ -1,4 +1,5 @@
 import AppKit
+import EventKit
 import SwiftUI
 
 private struct ScrollContentHeightKey: PreferenceKey {
@@ -15,6 +16,7 @@ struct EventListView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var measuredScrollContentHeight: CGFloat = 0
     @State private var collapsedDayIDs: Set<Date> = []
+    @State private var isAddingEvent = false
 
     private static let defaultExpandedDayCount = 2
 
@@ -140,7 +142,8 @@ struct EventListView: View {
     }
 
     private func pendingSection(_ record: AcknowledgmentRecord) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let event = appModel.primaryPendingAcknowledgmentEvent ?? CalendarEvent(from: record.key)
+        return VStack(alignment: .leading, spacing: 8) {
             Text("Needs acknowledgment")
                 .font(.headline)
             HStack {
@@ -149,9 +152,7 @@ struct EventListView: View {
                     Text(formattedStart(record.key.startDate)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Acknowledge") {
-                    Task { await appModel.acknowledge(record.key) }
-                }
+                pendingActions(for: event, key: record.key)
             }
             .padding(8)
             .background(Color(nsColor: .controlBackgroundColor))
@@ -159,10 +160,58 @@ struct EventListView: View {
         }
     }
 
+    @ViewBuilder
+    private func pendingActions(for event: CalendarEvent, key: EventKey) -> some View {
+        if event.callLink != nil || event.mapLink != nil {
+            HStack(spacing: 12) {
+                if let mapLink = event.mapLink {
+                    Button {
+                        acknowledgeThenOpen(key: key, link: mapLink)
+                    } label: {
+                        Image(systemName: "mappin.and.ellipse")
+                    }
+                    .accessibilityLabel("Open Location")
+                }
+                if let callLink = event.callLink {
+                    Button {
+                        acknowledgeThenOpen(key: key, link: callLink)
+                    } label: {
+                        Image(systemName: "video")
+                    }
+                    .accessibilityLabel("Join Call")
+                }
+            }
+        } else {
+            Button("Acknowledge") {
+                Task { await appModel.acknowledge(key) }
+            }
+        }
+    }
+
+    private func acknowledgeThenOpen(key: EventKey, link: URL) {
+        Task {
+            await appModel.acknowledge(key)
+            NSWorkspace.shared.open(link)
+        }
+    }
+
     private var upcomingHeader: some View {
-        Text("Upcoming")
-            .font(.headline)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack {
+            Text("Upcoming")
+                .font(.headline)
+            Spacer()
+            Button {
+                isAddingEvent = true
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Add Event")
+            .popover(isPresented: $isAddingEvent, arrowEdge: .bottom) {
+                AddEventForm()
+                    .environment(appModel)
+            }
+        }
     }
 
     private var upcomingEventsList: some View {
@@ -339,13 +388,15 @@ struct EventListView: View {
 
     private func shortCountdown(for date: Date, now: Date) -> String {
         CountdownFormatter.format(
-            remaining: CountdownFormatter.remaining(until: date, now: now)
+            remaining: CountdownFormatter.remaining(until: date, now: now),
+            roundUp: appModel.countdownRoundsUp
         ).listText
     }
 
     private func fullCountdown(for date: Date, now: Date) -> String {
         CountdownFormatter.fullRemainingListText(
-            remaining: CountdownFormatter.remaining(until: date, now: now)
+            remaining: CountdownFormatter.remaining(until: date, now: now),
+            roundUp: appModel.countdownRoundsUp
         )
     }
 
@@ -416,6 +467,71 @@ private struct DayEventGroup: Identifiable {
 
     var earliestEvent: CalendarEvent? {
         events.min(by: { $0.startDate < $1.startDate })
+    }
+}
+
+private struct AddEventForm: View {
+    @Environment(AppModel.self) private var appModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var title = ""
+    @State private var start = Date()
+    @State private var durationMinutes = 60
+    @State private var calendarID = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("New Event").font(.headline)
+
+            TextField("Title", text: $title)
+                .textFieldStyle(.roundedBorder)
+
+            DatePicker("Starts", selection: $start)
+                .datePickerStyle(.compact)
+
+            Stepper("Duration: \(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
+
+            Picker("Calendar", selection: $calendarID) {
+                ForEach(writableCalendars, id: \.calendarIdentifier) { calendar in
+                    Text(calendar.title).tag(calendar.calendarIdentifier)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Add") { addEvent() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+            }
+        }
+        .padding(14)
+        .frame(width: 300)
+        .onAppear {
+            if calendarID.isEmpty {
+                calendarID = writableCalendars.first?.calendarIdentifier ?? ""
+            }
+        }
+    }
+
+    private var writableCalendars: [EKCalendar] {
+        appModel.calendarService.allCalendars.filter(\.allowsContentModifications)
+    }
+
+    private func addEvent() {
+        isSaving = true
+        let end = start.addingTimeInterval(TimeInterval(durationMinutes * 60))
+        Task {
+            _ = await appModel.calendarService.createEvent(
+                title: title,
+                start: start,
+                end: end,
+                calendarID: calendarID.isEmpty ? nil : calendarID
+            )
+            await appModel.resyncNotifications()
+            dismiss()
+        }
     }
 }
 

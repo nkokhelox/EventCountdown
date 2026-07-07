@@ -86,6 +86,29 @@ final class CalendarService {
         await refresh()
     }
 
+    @MainActor
+    func createEvent(title: String, start: Date, end: Date, calendarID: String?) async -> Bool {
+        guard authorizationState == .authorized else { return false }
+        let event = EKEvent(eventStore: eventStore)
+        event.title = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New Event" : title
+        event.startDate = start
+        event.endDate = max(end, start.addingTimeInterval(60))
+
+        let calendar = allCalendars.first { $0.calendarIdentifier == calendarID }
+            ?? eventStore.defaultCalendarForNewEvents
+            ?? allCalendars.first { $0.allowsContentModifications }
+        guard let calendar else { return false }
+        event.calendar = calendar
+
+        do {
+            try eventStore.save(event, span: .thisEvent)
+            await refresh()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     func openCalendarSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
             NSWorkspace.shared.open(url)
