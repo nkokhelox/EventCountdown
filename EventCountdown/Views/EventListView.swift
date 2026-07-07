@@ -14,7 +14,6 @@ struct EventListView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
     @State private var measuredScrollContentHeight: CGFloat = 0
-    @State private var expandedEventIDs: Set<String> = []
     @State private var collapsedDayIDs: Set<Date> = []
 
     private static let defaultExpandedDayCount = 2
@@ -290,69 +289,42 @@ struct EventListView: View {
     }
 
     private func eventRow(_ event: CalendarEvent) -> some View {
-        let isExpanded = expandedEventIDs.contains(event.id)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(spacing: 10) {
+                Circle().fill(event.calendarColor).frame(width: 8, height: 8)
 
-        return TimelineView(.periodic(from: .now, by: 1)) { context in
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    toggleEventExpansion(event.id)
-                } label: {
-                    HStack(spacing: 10) {
-                        Circle().fill(event.calendarColor).frame(width: 8, height: 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    EventTitleLabel(event: event)
+                    Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
+                }
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            EventTitleLabel(event: event)
-                            Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(fullCountdown(for: event.startDate, now: context.date))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let callLink = event.callLink {
+                        Button {
+                            NSWorkspace.shared.open(callLink)
+                        } label: {
+                            Image(systemName: "video")
                         }
-
-                        Spacer(minLength: 8)
-
-                        Text(shortCountdown(for: event.startDate, now: context.date))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        .buttonStyle(.link)
+                        .help("Join Call")
+                        .accessibilityLabel("Join Call")
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .modifier(EventRowHoverHighlight())
-
-                if isExpanded {
-                    expandedEventDetails(event, now: context.date)
                 }
             }
-        }
-    }
-
-    private func expandedEventDetails(_ event: CalendarEvent, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(fullCountdown(for: event.startDate, now: now))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 12) {
-                Button("Open in Calendar") {
-                    appModel.calendarService.openCalendar(for: event)
-                }
-                .buttonStyle(.link)
-
-                Spacer()
-
-                if let callLink = event.callLink {
-                    Button {
-                        NSWorkspace.shared.open(callLink)
-                    } label: {
-                        Image(systemName: "video.fill")
-                    }
-                    .buttonStyle(.link)
-                    .help("Join Call")
-                    .accessibilityLabel("Join Call")
-                }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .modifier(EventRowHoverHighlight())
+            .onTapGesture(count: 2) {
+                appModel.calendarService.openCalendar(to: event.startDate)
             }
+            .help("Double-click to open in Calendar")
         }
-        .padding(.leading, 18)
-        .padding(.bottom, 6)
     }
 
     private func shortCountdown(for date: Date, now: Date) -> String {
@@ -372,14 +344,6 @@ struct EventListView: View {
             collapsedDayIDs.remove(day)
         } else {
             collapsedDayIDs.insert(day)
-        }
-    }
-
-    private func toggleEventExpansion(_ eventID: String) {
-        if expandedEventIDs.contains(eventID) {
-            expandedEventIDs.remove(eventID)
-        } else {
-            expandedEventIDs.insert(eventID)
         }
     }
 
