@@ -17,6 +17,10 @@ final class AppModel {
         didSet { UserDefaults.standard.set(openCalendarOnSingleClick, forKey: AppConstants.openCalendarOnSingleClickKey) }
     }
 
+    var countdownRoundsUp: Bool {
+        didSet { UserDefaults.standard.set(countdownRoundsUp, forKey: AppConstants.countdownRoundsUpKey) }
+    }
+
     init() {
         ackStore = AcknowledgmentStore()
         emojiStore = EmojiMappingStore()
@@ -24,6 +28,7 @@ final class AppModel {
         launchAtLoginService = LaunchAtLoginService()
         hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
         openCalendarOnSingleClick = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey)
+        countdownRoundsUp = UserDefaults.standard.bool(forKey: AppConstants.countdownRoundsUpKey)
 
         let ack = ackStore
         calendarService = CalendarService(pendingKeysProvider: {
@@ -72,7 +77,11 @@ final class AppModel {
     }
 
     func emojiResolution(for event: CalendarEvent) -> EventEmojiResolution {
-        EventTitleEmoji.resolve(for: event, ruleEmoji: emojiStore.ruleEmoji(for: event))
+        EventTitleEmoji.resolve(
+            for: event,
+            titleRuleEmoji: emojiStore.titleRuleEmoji(for: event),
+            calendarRuleEmoji: emojiStore.calendarRuleEmoji(for: event)
+        )
     }
 
     var nextCountdownEvent: CalendarEvent? {

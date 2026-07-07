@@ -5,18 +5,25 @@ enum EventTitleEmoji {
         text.leadingEmojiAndRemainder()?.emoji
     }
 
-    static func resolve(for event: CalendarEvent, ruleEmoji: String?) -> EventEmojiResolution {
+    static func resolve(
+        for event: CalendarEvent,
+        titleRuleEmoji: String?,
+        calendarRuleEmoji: String?
+    ) -> EventEmojiResolution {
         if let titleEmoji = leadingEmoji(in: event.title) {
             return EventEmojiResolution(character: titleEmoji)
         }
-        if let ruleEmoji {
-            return EventEmojiResolution(character: ruleEmoji)
+        if let titleRuleEmoji {
+            return EventEmojiResolution(character: titleRuleEmoji)
         }
         if let inferred = inferredEmoji(forTitle: event.title) {
             return EventEmojiResolution(character: inferred)
         }
         if let searched = EmojiNameSearch.firstEmoji(matchingName: event.title) {
             return EventEmojiResolution(character: searched)
+        }
+        if let calendarRuleEmoji {
+            return EventEmojiResolution(character: calendarRuleEmoji)
         }
         if let calendarEmoji = leadingEmoji(in: event.calendarTitle) {
             return EventEmojiResolution(character: calendarEmoji)
