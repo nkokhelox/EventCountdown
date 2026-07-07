@@ -20,6 +20,7 @@ final class CalendarService {
 
     private(set) var authorizationState: CalendarAuthorizationState = .notDetermined
     private(set) var upcomingEvents: [CalendarEvent] = []
+    private(set) var recentPastEvent: CalendarEvent?
     private(set) var allCalendars: [EKCalendar] = []
     var enabledCalendarIDs: Set<String> {
         didSet { UserDefaults.standard.set(Array(enabledCalendarIDs), forKey: AppConstants.enabledCalendarIDsKey) }
@@ -173,15 +174,20 @@ final class CalendarService {
 
         let now = Date()
         let end = Calendar.current.date(byAdding: .year, value: AppConstants.fetchHorizonYears, to: now) ?? now
+        let start = Calendar.current.date(byAdding: .day, value: -AppConstants.pastFetchHorizonDays, to: now)
+            ?? now.addingTimeInterval(-AppConstants.ackWindowSeconds)
         let calendars = allCalendars.filter { enabledCalendarIDs.contains($0.calendarIdentifier) }
-        let predicate = eventStore.predicateForEvents(withStart: now.addingTimeInterval(-AppConstants.ackWindowSeconds), end: end, calendars: calendars)
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: calendars)
         let ekEvents = eventStore.events(matching: predicate)
 
         let pendingKeys = pendingKeysProvider()
-        let mapped = ekEvents.map(CalendarEvent.init(from:)).filter { event in
-            event.startDate > now || pendingKeys.contains(event.eventKey.storageKey)
-        }
-        upcomingEvents = mapped.sorted { $0.startDate < $1.startDate }
+        let allEvents = ekEvents.map(CalendarEvent.init(from:))
+        upcomingEvents = allEvents
+            .filter { $0.startDate > now || pendingKeys.contains($0.eventKey.storageKey) }
+            .sorted { $0.startDate < $1.startDate }
+        recentPastEvent = allEvents
+            .filter { $0.startDate <= now && !pendingKeys.contains($0.eventKey.storageKey) }
+            .max { $0.startDate < $1.startDate }
         lastDailyRefresh = now
     }
 

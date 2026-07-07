@@ -113,6 +113,9 @@ struct EventListView: View {
             if let pending = appModel.ackStore.primaryPendingRecord {
                 pendingSection(pending)
             }
+            if let past = appModel.calendarService.recentPastEvent {
+                pastSection(past)
+            }
             upcomingHeader
             if appModel.calendarService.panelEvents.isEmpty {
                 Text("No upcoming events in the selected calendars.")
@@ -192,6 +195,14 @@ struct EventListView: View {
         Task {
             await appModel.acknowledge(key)
             NSWorkspace.shared.open(link)
+        }
+    }
+
+    private func pastSection(_ event: CalendarEvent) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Past")
+                .font(.headline)
+            eventRow(event, showDivider: false, isPast: true)
         }
     }
 
@@ -327,7 +338,7 @@ struct EventListView: View {
         return formatter.string(from: day)
     }
 
-    private func eventRow(_ event: CalendarEvent, showDivider: Bool) -> some View {
+    private func eventRow(_ event: CalendarEvent, showDivider: Bool, isPast: Bool = false) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
@@ -340,22 +351,14 @@ struct EventListView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if let mapLink = event.mapLink {
-                            Button {
+                            iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: isPast) {
                                 NSWorkspace.shared.open(mapLink)
-                            } label: {
-                                Image(systemName: "mappin.and.ellipse")
                             }
-                            .buttonStyle(.link)
-                            .accessibilityLabel("Open Location")
                         }
                         if let callLink = event.callLink {
-                            Button {
+                            iconLinkButton(system: "video", label: "Join Call", greyed: isPast) {
                                 NSWorkspace.shared.open(callLink)
-                            } label: {
-                                Image(systemName: "video")
                             }
-                            .buttonStyle(.link)
-                            .accessibilityLabel("Join Call")
                         }
                     }
 
@@ -364,7 +367,9 @@ struct EventListView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 8)
-                        Text(fullCountdown(for: event.startDate, now: context.date))
+                        Text(isPast
+                            ? agoText(for: event.startDate, now: context.date)
+                            : fullCountdown(for: event.startDate, now: context.date))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -396,6 +401,37 @@ struct EventListView: View {
     private func fullCountdown(for date: Date, now: Date) -> String {
         CountdownFormatter.fullRemainingListText(
             remaining: CountdownFormatter.remaining(until: date, now: now),
+            roundUp: appModel.countdownRoundsUp
+        )
+    }
+
+    @ViewBuilder
+    private func iconLinkButton(
+        system: String,
+        label: String,
+        greyed: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        if greyed {
+            Button(action: action) {
+                Image(systemName: system)
+                    .foregroundStyle(.secondary)
+                    .opacity(0.5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(label)
+        } else {
+            Button(action: action) {
+                Image(systemName: system)
+            }
+            .buttonStyle(.link)
+            .accessibilityLabel(label)
+        }
+    }
+
+    private func agoText(for date: Date, now: Date) -> String {
+        CountdownFormatter.agoText(
+            elapsed: now.timeIntervalSince(date),
             roundUp: appModel.countdownRoundsUp
         )
     }

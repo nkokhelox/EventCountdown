@@ -15,6 +15,7 @@ enum AppConstants {
     static let maxReminderChains = 10
     static let displayEventCount = 5
     static let panelHorizonDays = 7
+    static let pastFetchHorizonDays = 30
     static let scheduleEventCount = 20
     static let fetchHorizonYears = 3
     static let firstRunKey = "hasSeenFirstRunHint"

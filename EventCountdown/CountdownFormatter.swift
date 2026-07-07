@@ -112,6 +112,11 @@ enum CountdownFormatter {
         date.timeIntervalSince(now)
     }
 
+    static func agoText(elapsed interval: TimeInterval, roundUp: Bool = false) -> String {
+        if interval <= 0 { return "now" }
+        return "\(format(remaining: interval, roundUp: roundUp).menuBarText) ago"
+    }
+
     static func fullRemainingListText(remaining interval: TimeInterval, roundUp: Bool = false) -> String {
         if interval <= 0 { return "now" }
 
