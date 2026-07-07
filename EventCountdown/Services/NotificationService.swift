@@ -29,7 +29,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
                 NSWorkspace.shared.open(url)
             }
             if let key = userInfo["eventKey"] as? String {
-                onDelivered?(key)
+                onAcknowledge?(key)
             }
         } else {
             handlePayload(userInfo)
@@ -196,7 +196,7 @@ final class NotificationService {
         )
         let withCall = UNNotificationCategory(
             identifier: "EVENT_STARTED_CALL",
-            actions: [joinCall, acknowledge],
+            actions: [joinCall],
             intentIdentifiers: []
         )
         let withoutCall = UNNotificationCategory(identifier: "EVENT_STARTED", actions: [acknowledge], intentIdentifiers: [])
@@ -295,7 +295,6 @@ final class NotificationService {
         await scheduleUpcoming(events: events, emojiProvider: emojiProvider)
     }
 
-    /// Clears delivered notifications for events that are no longer pending acknowledgment.
     private func removeDeliveredAcknowledgmentNotifications() async {
         let validPendingKeys = Set(ackStore.pendingRecords.map(\.key.storageKey))
         let delivered = await center.deliveredNotifications()
@@ -316,6 +315,7 @@ final class NotificationService {
         var bodyParts: [String] = [formattedStart(event)]
         if let location = event.location, !location.isEmpty { bodyParts.append(location) }
         if let notes = event.notes?.split(separator: "\n").first, !notes.isEmpty { bodyParts.append(String(notes)) }
+        if let callLink = event.callLink { bodyParts.append(callLink.absoluteString) }
         content.body = bodyParts.joined(separator: " · ")
         content.categoryIdentifier = event.callLink == nil ? "EVENT_STARTED" : "EVENT_STARTED_CALL"
         content.sound = .default
