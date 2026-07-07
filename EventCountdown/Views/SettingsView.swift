@@ -73,6 +73,20 @@ struct SettingsView: View {
                     }
                 }
 
+                aboutSettingsGroup(title: "Events", systemImage: "hand.tap") {
+                    Picker("Open Calendar on", selection: Binding(
+                        get: { appModel.openCalendarOnSingleClick },
+                        set: { appModel.openCalendarOnSingleClick = $0 }
+                    )) {
+                        Text("Double click").tag(false)
+                        Text("Single click").tag(true)
+                    }
+                    .pickerStyle(.radioGroup)
+                    Text("Choose whether clicking or double-clicking an event opens Calendar to that day.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 aboutSettingsGroup(title: "Notifications", systemImage: "bell") {
                     Toggle("Enable notifications", isOn: Binding(
                         get: { appModel.notificationService.isEnabled },

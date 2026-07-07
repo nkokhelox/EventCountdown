@@ -13,12 +13,17 @@ final class AppModel {
         didSet { UserDefaults.standard.set(hasSeenFirstRunHint, forKey: AppConstants.firstRunKey) }
     }
 
+    var openCalendarOnSingleClick: Bool {
+        didSet { UserDefaults.standard.set(openCalendarOnSingleClick, forKey: AppConstants.openCalendarOnSingleClickKey) }
+    }
+
     init() {
         ackStore = AcknowledgmentStore()
         emojiStore = EmojiMappingStore()
         notificationService = NotificationService(ackStore: ackStore)
         launchAtLoginService = LaunchAtLoginService()
         hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
+        openCalendarOnSingleClick = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey)
 
         let ack = ackStore
         calendarService = CalendarService(pendingKeysProvider: {
@@ -70,10 +75,6 @@ final class AppModel {
         EventTitleEmoji.resolve(for: event, ruleEmoji: emojiStore.ruleEmoji(for: event))
     }
 
-    func labeledTitle(for event: CalendarEvent) -> String {
-        EventTitleEmoji.labeledTitle(fullTitle: event.title, resolution: emojiResolution(for: event))
-    }
-
     var nextCountdownEvent: CalendarEvent? {
         let now = Date()
         return calendarService.upcomingEvents.first { $0.startDate > now }
@@ -85,7 +86,6 @@ final class AppModel {
             ?? CalendarEvent(from: record.key)
     }
 
-    /// Menu bar shows the one event needing acknowledgment, otherwise the next upcoming event.
     var menuBarEvent: CalendarEvent? {
         primaryPendingAcknowledgmentEvent ?? nextCountdownEvent
     }
@@ -94,7 +94,6 @@ final class AppModel {
         ackStore.primaryPendingRecord != nil
     }
 
-    /// Bumped every second so the menu bar label refreshes without TimelineView.
     private(set) var tick = Date()
 
     @MainActor

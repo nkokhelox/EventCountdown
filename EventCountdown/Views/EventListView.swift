@@ -160,19 +160,9 @@ struct EventListView: View {
     }
 
     private var upcomingHeader: some View {
-        HStack {
-            Text("Upcoming")
-                .font(.headline)
-            Spacer()
-            Button {
-                appModel.calendarService.openCalendarToToday()
-            } label: {
-                Image(systemName: "calendar")
-            }
-            .buttonStyle(.borderless)
-            .help("Open Calendar to today")
-            .accessibilityLabel("Open Calendar to today")
-        }
+        Text("Upcoming")
+            .font(.headline)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var upcomingEventsList: some View {
@@ -228,8 +218,8 @@ struct EventListView: View {
             .buttonStyle(.plain)
 
             if !isCollapsed {
-                ForEach(group.events) { event in
-                    eventRow(event)
+                ForEach(Array(group.events.enumerated()), id: \.element.id) { index, event in
+                    eventRow(event, showDivider: index < group.events.count - 1)
                 }
             }
         }
@@ -288,42 +278,62 @@ struct EventListView: View {
         return formatter.string(from: day)
     }
 
-    private func eventRow(_ event: CalendarEvent) -> some View {
+    private func eventRow(_ event: CalendarEvent, showDivider: Bool) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 10) {
-                Circle().fill(event.calendarColor).frame(width: 8, height: 8)
+            VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 10) {
+                EventLeadingGlyph(resolution: appModel.emojiResolution(for: event))
+                    .frame(width: 30)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    EventTitleLabel(event: event)
-                    Text(formattedStart(event.startDate)).font(.caption).foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(fullCountdown(for: event.startDate, now: context.date))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    if let callLink = event.callLink {
-                        Button {
-                            NSWorkspace.shared.open(callLink)
-                        } label: {
-                            Image(systemName: "video")
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        EventTitleLabel(event: event)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        if let mapLink = event.mapLink {
+                            Button {
+                                NSWorkspace.shared.open(mapLink)
+                            } label: {
+                                Image(systemName: "mappin.and.ellipse")
+                            }
+                            .buttonStyle(.link)
+                            .accessibilityLabel("Open Location")
                         }
-                        .buttonStyle(.link)
-                        .help("Join Call")
-                        .accessibilityLabel("Join Call")
+                        if let callLink = event.callLink {
+                            Button {
+                                NSWorkspace.shared.open(callLink)
+                            } label: {
+                                Image(systemName: "video")
+                            }
+                            .buttonStyle(.link)
+                            .accessibilityLabel("Join Call")
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Text(formattedStart(event.startDate))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        Text(fullCountdown(for: event.startDate, now: context.date))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .modifier(EventRowHoverHighlight())
-            .onTapGesture(count: 2) {
+            .onTapGesture(count: appModel.openCalendarOnSingleClick ? 1 : 2) {
                 appModel.calendarService.openCalendar(to: event.startDate)
             }
-            .help("Double-click to open in Calendar")
+
+                if showDivider {
+                    Divider()
+                        .padding(.leading, 48)
+                }
+            }
         }
     }
 
@@ -368,7 +378,11 @@ struct EventListView: View {
             .help("Settings")
             .accessibilityLabel("Settings")
             Spacer()
-            Button("Quit") { NSApplication.shared.terminate(nil) }
+            Button { NSApplication.shared.terminate(nil) } label: {
+                Image(systemName: "power")
+            }
+            .help("Quit")
+            .accessibilityLabel("Quit")
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 12)
@@ -405,23 +419,26 @@ private struct DayEventGroup: Identifiable {
     }
 }
 
+private struct EventLeadingGlyph: View {
+    let resolution: EventEmojiResolution
+
+    var body: some View {
+        if resolution.usesAppIcon, let image = AppIconRenderer.image(pointSize: 28) {
+            Image(nsImage: image)
+                .frame(width: 28, height: 28)
+        } else if let character = resolution.character {
+            Text(character)
+                .font(.system(size: 26))
+        }
+    }
+}
+
 private struct EventTitleLabel: View {
-    @Environment(AppModel.self) private var appModel
     let event: CalendarEvent
 
     var body: some View {
-        let resolution = appModel.emojiResolution(for: event)
-        let text = appModel.labeledTitle(for: event)
-
-        if resolution.usesAppIcon {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                AppIconLabelImage(style: .menuBar)
-                Text(text)
-                    .font(.body)
-            }
-        } else {
-            Text(text)
-        }
+        Text(EventTitleEmoji.titleWithoutLeadingEmoji(event.title))
+            .font(.body)
     }
 }
 

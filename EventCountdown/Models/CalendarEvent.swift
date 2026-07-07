@@ -23,6 +23,14 @@ struct CalendarEvent: Identifiable, Sendable {
         EventCallLink.resolve(eventURL: url, location: location, notes: notes)
     }
 
+    var mapLink: URL? {
+        guard let location, !location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let encoded = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return nil
+        }
+        return URL(string: "https://maps.apple.com/?q=\(encoded)")
+    }
+
     init(from event: EKEvent) {
         let identifier = event.eventIdentifier ?? UUID().uuidString
         self.id = "\(identifier)|\(event.startDate.timeIntervalSince1970)"
