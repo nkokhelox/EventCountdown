@@ -77,44 +77,45 @@ enum CountdownFormatter {
     private static let oneHour = hour
     private static let oneMinute = minute
 
-    static func format(remaining interval: TimeInterval, now: Date = Date()) -> CountdownValue {
-        format(remaining: interval)
-    }
-
-    static func format(remaining interval: TimeInterval) -> CountdownValue {
+    static func format(remaining interval: TimeInterval, roundUp: Bool = false) -> CountdownValue {
         if interval <= 0 {
             return CountdownValue(value: 0, unit: .seconds, isPast: true)
         }
 
+        func amount(_ unit: TimeInterval) -> Int {
+            let raw = interval / unit
+            return max(1, Int(roundUp ? raw.rounded(.up) : raw.rounded(.down)))
+        }
+
         if interval > twoYears {
-            return CountdownValue(value: max(1, Int(interval / year)), unit: .years, isPast: false)
+            return CountdownValue(value: amount(year), unit: .years, isPast: false)
         }
         if interval > threeMonths {
-            return CountdownValue(value: max(1, Int(interval / month)), unit: .months, isPast: false)
+            return CountdownValue(value: amount(month), unit: .months, isPast: false)
         }
         if interval > twoWeeks {
-            return CountdownValue(value: max(1, Int(interval / week)), unit: .weeks, isPast: false)
+            return CountdownValue(value: amount(week), unit: .weeks, isPast: false)
         }
         if interval > twoDays {
-            return CountdownValue(value: max(1, Int(interval / day)), unit: .days, isPast: false)
+            return CountdownValue(value: amount(day), unit: .days, isPast: false)
         }
         if interval >= oneHour {
-            return CountdownValue(value: max(1, Int(interval / hour)), unit: .hours, isPast: false)
+            return CountdownValue(value: amount(hour), unit: .hours, isPast: false)
         }
         if interval > oneMinute {
-            return CountdownValue(value: max(1, Int(interval / minute)), unit: .minutes, isPast: false)
+            return CountdownValue(value: amount(minute), unit: .minutes, isPast: false)
         }
-        return CountdownValue(value: max(1, Int(interval)), unit: .seconds, isPast: false)
+        return CountdownValue(value: amount(1), unit: .seconds, isPast: false)
     }
 
     static func remaining(until date: Date, now: Date = Date()) -> TimeInterval {
         date.timeIntervalSince(now)
     }
 
-    static func fullRemainingListText(remaining interval: TimeInterval) -> String {
+    static func fullRemainingListText(remaining interval: TimeInterval, roundUp: Bool = false) -> String {
         if interval <= 0 { return "now" }
 
-        var seconds = Int(interval)
+        var seconds = roundUp ? Int((interval / minute).rounded(.up)) * Int(minute) : Int(interval)
         var parts: [String] = []
         let units: [(Int, CountdownUnit)] = [
             (Int(year), .years),
