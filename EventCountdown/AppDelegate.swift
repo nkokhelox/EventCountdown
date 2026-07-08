@@ -11,6 +11,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Called when the user clicks the app in the Applications folder / Finder while
+    // it is already running. As a menu-bar agent (LSUIElement) there is no Dock icon
+    // and no window to reopen, so a click would otherwise do nothing. Surface the app
+    // by activating it and showing Settings so the click has a visible effect.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            showSettings(openSettings: {})
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        return true
+    }
+
     func showSettings(openSettings: @escaping () -> Void) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
