@@ -28,7 +28,7 @@ enum CountdownUnit: String, CaseIterable {
         case .years: return plural ? "yrs" : "yr"
         case .months: return plural ? "mos" : "mo"
         case .weeks: return plural ? "wks" : "wk"
-        case .days: return "d"
+        case .days: return plural ? "days" : "day"
         case .hours: return plural ? "hrs" : "hr"
         case .minutes: return plural ? "mins" : "min"
         case .seconds: return plural ? "secs" : "sec"
