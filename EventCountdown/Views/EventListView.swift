@@ -346,13 +346,19 @@ struct EventListView: View {
                         EventTitleLabel(event: event)
                             .lineLimit(1)
                         Spacer(minLength: 8)
+                        if event.mapLink == nil && event.callLink == nil {
+                            Circle()
+                                .fill(event.calendarColor)
+                                .frame(width: 7, height: 7)
+                                .accessibilityHidden(true)
+                        }
                         if let mapLink = event.mapLink {
-                            iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: mode == .past) {
+                            iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: mode == .past, color: event.calendarColor) {
                                 NSWorkspace.shared.open(mapLink)
                             }
                         }
                         if let callLink = event.callLink {
-                            iconLinkButton(system: "video", label: "Join Call", greyed: mode == .past) {
+                            iconLinkButton(system: "video", label: "Join Call", greyed: mode == .past, color: event.calendarColor) {
                                 NSWorkspace.shared.open(callLink)
                             }
                         }
@@ -372,7 +378,7 @@ struct EventListView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .modifier(EventRowHoverHighlight())
+            .modifier(EventRowHoverHighlight(baseTint: rowTint(for: mode, event: event)))
             .onTapGesture(count: appModel.openCalendarOnSingleClick ? 1 : 2) {
                 appModel.calendarService.openCalendar(to: event.startDate)
             }
@@ -395,6 +401,11 @@ struct EventListView: View {
         CountdownFormatter.fullRemainingListText(
             remaining: CountdownFormatter.remaining(until: date, now: now)
         )
+    }
+
+    // Only the in-progress (ongoing) event is tinted, with a faint red highlight.
+    private func rowTint(for mode: EventRowMode, event: CalendarEvent) -> Color {
+        mode == .now ? Color.red.opacity(0.12) : .clear
     }
 
     // Single most-significant unit, e.g. "1 hour" or "45 minutes".
@@ -422,23 +433,16 @@ struct EventListView: View {
         system: String,
         label: String,
         greyed: Bool,
+        color: Color,
         action: @escaping () -> Void
     ) -> some View {
-        if greyed {
-            Button(action: action) {
-                Image(systemName: system)
-                    .foregroundStyle(.secondary)
-                    .opacity(0.5)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(label)
-        } else {
-            Button(action: action) {
-                Image(systemName: system)
-            }
-            .buttonStyle(.link)
-            .accessibilityLabel(label)
+        Button(action: action) {
+            Image(systemName: system)
+                .foregroundStyle(greyed ? AnyShapeStyle(Color.secondary) : AnyShapeStyle(color))
+                .opacity(greyed ? 0.5 : 1)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private func agoText(for date: Date, now: Date) -> String {
@@ -601,6 +605,7 @@ private struct EventTitleLabel: View {
 }
 
 private struct EventRowHoverHighlight: ViewModifier {
+    var baseTint: Color = .clear
     @State private var isHovered = false
 
     func body(content: Content) -> some View {
@@ -609,7 +614,11 @@ private struct EventRowHoverHighlight: ViewModifier {
             .padding(.vertical, 6)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                    .fill(baseTint)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+                    }
             }
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .onHover { isHovered = $0 }
