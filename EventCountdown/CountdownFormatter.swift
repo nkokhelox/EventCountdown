@@ -79,14 +79,13 @@ enum CountdownFormatter {
     private static let oneHour = hour
     private static let oneMinute = minute
 
-    static func format(remaining interval: TimeInterval, roundUp: Bool = false) -> CountdownValue {
+    static func format(remaining interval: TimeInterval) -> CountdownValue {
         if interval <= 0 {
             return CountdownValue(value: 0, unit: .seconds, isPast: true)
         }
 
         func amount(_ unit: TimeInterval) -> Int {
-            let raw = interval / unit
-            return max(1, Int(roundUp ? raw.rounded(.up) : raw.rounded(.down)))
+            max(1, Int((interval / unit).rounded(.down)))
         }
 
         if interval > twoYears {
@@ -110,19 +109,55 @@ enum CountdownFormatter {
         return CountdownValue(value: amount(1), unit: .seconds, isPast: false)
     }
 
+    // Menu bar countdown as a single unit with one decimal place, e.g. 1h30m -> "1.5 hrs".
+    // The whole part is kept without a trailing ".0" (2h -> "2 hrs").
+    static func menuBarDecimalText(remaining interval: TimeInterval) -> String {
+        if interval <= 0 { return "now" }
+        // Under a minute: whole seconds, rounded up so each value shows for exactly
+        // one second and the countdown reaches the event (0 -> "now") on time.
+        if interval < 60 {
+            let seconds = Int(interval.rounded(.up))
+            if seconds < 60 {
+                return "\(seconds) \(CountdownUnit.seconds.compactLabel(for: seconds))"
+            }
+            // interval is in (59, 60): show "1 min" rather than "60 sec".
+            return "1 \(CountdownUnit.minutes.compactLabel(for: 1))"
+        }
+        // A minute or more: the largest fitting unit with one decimal, truncated so
+        // the value never overstates the true remaining time (no phantom extra minute).
+        let (unit, unitSeconds) = menuBarUnit(for: interval)
+        let value = max(0.1, (interval / unitSeconds * 10).rounded(.down) / 10)
+        let number = value == value.rounded()
+            ? String(Int(value))
+            : String(format: "%.1f", value)
+        return "\(number) \(unit.compactLabel(for: value == 1 ? 1 : 2))"
+    }
+
+    private static func menuBarUnit(for interval: TimeInterval) -> (CountdownUnit, TimeInterval) {
+        if interval > twoYears { return (.years, year) }
+        if interval > threeMonths { return (.months, month) }
+        if interval > twoWeeks { return (.weeks, week) }
+        if interval > twoDays { return (.days, day) }
+        if interval >= oneHour { return (.hours, hour) }
+        if interval >= oneMinute { return (.minutes, minute) }
+        return (.seconds, 1)
+    }
+
     static func remaining(until date: Date, now: Date = Date()) -> TimeInterval {
         date.timeIntervalSince(now)
     }
 
-    static func agoText(elapsed interval: TimeInterval, roundUp: Bool = false) -> String {
+    static func agoText(elapsed interval: TimeInterval) -> String {
         if interval <= 0 { return "now" }
-        return "\(format(remaining: interval, roundUp: roundUp).menuBarText) ago"
+        return "\(fullRemainingListText(remaining: interval)) ago"
     }
 
-    static func fullRemainingListText(remaining interval: TimeInterval, roundUp: Bool = false) -> String {
+    // Event-list countdown: the two most significant non-zero units, e.g.
+    // "1 year 3 months" or "2 days 3 hours". Smaller units are omitted.
+    static func fullRemainingListText(remaining interval: TimeInterval) -> String {
         if interval <= 0 { return "now" }
 
-        var seconds = roundUp ? Int((interval / minute).rounded(.up)) * Int(minute) : Int(interval)
+        var seconds = Int(interval)
         var parts: [String] = []
         let units: [(Int, CountdownUnit)] = [
             (Int(year), .years),
@@ -131,9 +166,10 @@ enum CountdownFormatter {
             (Int(day), .days),
             (Int(hour), .hours),
             (Int(minute), .minutes),
+            (1, .seconds),
         ]
 
-        for (unitSeconds, unit) in units {
+        for (unitSeconds, unit) in units where parts.count < 2 {
             let count = seconds / unitSeconds
             if count > 0 {
                 parts.append("\(count) \(unit.fullLabel(for: count))")
@@ -142,7 +178,7 @@ enum CountdownFormatter {
         }
 
         if parts.isEmpty {
-            return "1 minute"
+            return "0 seconds"
         }
         return parts.joined(separator: " ")
     }

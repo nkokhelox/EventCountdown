@@ -54,7 +54,7 @@ struct MenuBarLabelView: View {
 
     private func countdownText(for event: CalendarEvent) -> String {
         let remaining = CountdownFormatter.remaining(until: event.startDate, now: appModel.tick)
-        var countdown = CountdownFormatter.format(remaining: remaining, roundUp: appModel.countdownRoundsUp).menuBarText
+        var countdown = CountdownFormatter.menuBarDecimalText(remaining: remaining)
         if countdown.count > 24 {
             countdown = String(countdown.prefix(24))
         }

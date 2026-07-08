@@ -95,21 +95,6 @@ struct SettingsView: View {
                     }
 
                     eventsSubgroup(
-                        "Remaining time",
-                        description: "Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\"."
-                    ) {
-                        Picker("", selection: Binding(
-                            get: { appModel.countdownRoundsUp },
-                            set: { appModel.countdownRoundsUp = $0 }
-                        )) {
-                            Text("Round down").tag(false)
-                            Text("Round up").tag(true)
-                        }
-                        .pickerStyle(.radioGroup)
-                        .labelsHidden()
-                    }
-
-                    eventsSubgroup(
                         "Show past event for",
                         description: "How long a just-passed event stays in the panel's Past section."
                     ) {

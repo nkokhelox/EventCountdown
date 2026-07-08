@@ -84,8 +84,8 @@ final class CountdownFormatterTests: XCTestCase {
         XCTAssertEqual(text, "13 hours 45 minutes")
     }
 
-    func testFullRemainingListTextIncludesDaysHoursAndMinutes() {
+    func testFullRemainingListTextShowsTopTwoUnitsOnly() {
         let text = CountdownFormatter.fullRemainingListText(remaining: 2 * day + 3 * hour + 20 * minute)
-        XCTAssertEqual(text, "2 days 3 hours 20 minutes")
+        XCTAssertEqual(text, "2 days 3 hours")
     }
 }

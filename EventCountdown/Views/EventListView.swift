@@ -386,16 +386,14 @@ struct EventListView: View {
     }
 
     private func shortCountdown(for date: Date, now: Date) -> String {
-        CountdownFormatter.format(
-            remaining: CountdownFormatter.remaining(until: date, now: now),
-            roundUp: appModel.countdownRoundsUp
-        ).listText
+        CountdownFormatter.menuBarDecimalText(
+            remaining: CountdownFormatter.remaining(until: date, now: now)
+        )
     }
 
     private func fullCountdown(for date: Date, now: Date) -> String {
         CountdownFormatter.fullRemainingListText(
-            remaining: CountdownFormatter.remaining(until: date, now: now),
-            roundUp: appModel.countdownRoundsUp
+            remaining: CountdownFormatter.remaining(until: date, now: now)
         )
     }
 
@@ -438,8 +436,7 @@ struct EventListView: View {
 
     private func agoText(for date: Date, now: Date) -> String {
         CountdownFormatter.agoText(
-            elapsed: now.timeIntervalSince(date),
-            roundUp: appModel.countdownRoundsUp
+            elapsed: now.timeIntervalSince(date)
         )
     }
 
