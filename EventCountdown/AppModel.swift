@@ -21,6 +21,11 @@ final class AppModel {
         didSet { UserDefaults.standard.set(countdownRoundsUp, forKey: AppConstants.countdownRoundsUpKey) }
     }
 
+    // How long a just-passed event stays in the panel's "Past" section, in hours.
+    var pastEventWindowHours: Int {
+        didSet { UserDefaults.standard.set(pastEventWindowHours, forKey: AppConstants.pastEventWindowHoursKey) }
+    }
+
     init() {
         ackStore = AcknowledgmentStore()
         emojiStore = EmojiMappingStore()
@@ -29,6 +34,8 @@ final class AppModel {
         hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
         openCalendarOnSingleClick = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey)
         countdownRoundsUp = UserDefaults.standard.bool(forKey: AppConstants.countdownRoundsUpKey)
+        let storedPastWindowHours = UserDefaults.standard.integer(forKey: AppConstants.pastEventWindowHoursKey)
+        pastEventWindowHours = storedPastWindowHours == 0 ? AppConstants.defaultPastEventWindowHours : storedPastWindowHours
 
         let ack = ackStore
         calendarService = CalendarService(pendingKeysProvider: {

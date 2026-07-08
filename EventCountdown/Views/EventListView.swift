@@ -199,10 +199,16 @@ struct EventListView: View {
     }
 
     private func pastSection(_ event: CalendarEvent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Past")
-                .font(.headline)
-            eventRow(event, showDivider: false, isPast: true)
+        // Only surface the past event while it is still recent — within the last hour.
+        // Wrapped in a TimelineView so it disappears live once it ages out.
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if context.date.timeIntervalSince(event.startDate) <= TimeInterval(appModel.pastEventWindowHours) * 60 * 60 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Past")
+                        .font(.headline)
+                    eventRow(event, showDivider: false, isPast: true)
+                }
+            }
         }
     }
 

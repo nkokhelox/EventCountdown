@@ -97,6 +97,20 @@ struct SettingsView: View {
                     Text("Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\".")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Picker("Show past event for", selection: Binding(
+                        get: { appModel.pastEventWindowHours },
+                        set: { appModel.pastEventWindowHours = $0 }
+                    )) {
+                        Text("1 hour").tag(1)
+                        Text("2 hours").tag(2)
+                        Text("4 hours").tag(4)
+                        Text("8 hours").tag(8)
+                    }
+                    .pickerStyle(.menu)
+                    Text("How long a just-passed event stays in the panel's Past section.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 aboutSettingsGroup(title: "Notifications", systemImage: "bell") {

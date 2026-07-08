@@ -5,6 +5,7 @@ enum AppConstants {
     static let notificationPrefix = "eventcountdown."
     static let ackWindowSeconds: TimeInterval = 5 * 60
     static let ackNowDisplaySeconds: TimeInterval = 60
+    static let defaultPastEventWindowHours = 2
     static let reminderIntervalSeconds: TimeInterval = {
         #if DEBUG && DEBUG_SHORT_ACK_WINDOW
         return 60
@@ -21,6 +22,7 @@ enum AppConstants {
     static let firstRunKey = "hasSeenFirstRunHint"
     static let openCalendarOnSingleClickKey = "openCalendarOnSingleClick"
     static let countdownRoundsUpKey = "countdownRoundsUp"
+    static let pastEventWindowHoursKey = "pastEventWindowHours"
     static let launchAtLoginKey = "launchAtLoginEnabled"
     static let notificationsEnabledKey = "notificationsEnabled"
     static let enabledCalendarIDsKey = "enabledCalendarIDs"
