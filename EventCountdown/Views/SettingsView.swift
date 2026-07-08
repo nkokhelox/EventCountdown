@@ -86,6 +86,8 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
+                    Divider()
+
                     Picker("Remaining time", selection: Binding(
                         get: { appModel.countdownRoundsUp },
                         set: { appModel.countdownRoundsUp = $0 }
@@ -97,6 +99,8 @@ struct SettingsView: View {
                     Text("Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\".")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Divider()
 
                     Picker("Show past event for", selection: Binding(
                         get: { appModel.pastEventWindowHours },
