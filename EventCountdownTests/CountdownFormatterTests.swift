@@ -88,4 +88,16 @@ final class CountdownFormatterTests: XCTestCase {
         let text = CountdownFormatter.fullRemainingListText(remaining: 2 * day + 3 * hour + 20 * minute)
         XCTAssertEqual(text, "2 days 3 hours")
     }
+
+    func testOngoingLabelIsCapitalized() {
+        XCTAssertEqual(CountdownFormatter.ongoingLabel(elapsedSinceStart: 0), "Now")
+        XCTAssertEqual(CountdownFormatter.ongoingLabel(elapsedSinceStart: 2 * minute), "Ongoing")
+    }
+
+    func testMenuBarDecimalTextIsCapitalized() {
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 30), "30 Secs")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 2 * minute), "2 Mins")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: hour + 30 * minute), "1.5 Hrs")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: minute), "1 Min")
+    }
 }

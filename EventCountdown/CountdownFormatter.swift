@@ -62,9 +62,9 @@ enum CountdownFormatter {
     // ackNowDisplaySeconds, then "ongoing" for the remainder of the window.
     static func ongoingLabel(elapsedSinceStart: TimeInterval) -> String {
         if elapsedSinceStart < AppConstants.ackNowDisplaySeconds {
-            return "now"
+            return "Now"
         }
-        return "ongoing"
+        return "Ongoing"
     }
     private static let year: TimeInterval = 365 * 24 * 60 * 60
     private static let month: TimeInterval = 30 * 24 * 60 * 60
@@ -112,16 +112,16 @@ enum CountdownFormatter {
     // Menu bar countdown as a single unit with one decimal place, e.g. 1h30m -> "1.5 hrs".
     // The whole part is kept without a trailing ".0" (2h -> "2 hrs").
     static func menuBarDecimalText(remaining interval: TimeInterval) -> String {
-        if interval <= 0 { return "now" }
+        if interval <= 0 { return "Now" }
         // Under a minute: whole seconds, rounded up so each value shows for exactly
-        // one second and the countdown reaches the event (0 -> "now") on time.
+        // one second and the countdown reaches the event (0 -> "Now") on time.
         if interval < 60 {
             let seconds = Int(interval.rounded(.up))
             if seconds < 60 {
-                return "\(seconds) \(CountdownUnit.seconds.compactLabel(for: seconds))"
+                return "\(seconds) \(CountdownUnit.seconds.compactLabel(for: seconds))".capitalized
             }
-            // interval is in (59, 60): show "1 min" rather than "60 sec".
-            return "1 \(CountdownUnit.minutes.compactLabel(for: 1))"
+            // interval is in (59, 60): show "1 Min" rather than "60 Sec".
+            return "1 \(CountdownUnit.minutes.compactLabel(for: 1))".capitalized
         }
         // A minute or more: the largest fitting unit with one decimal, truncated so
         // the value never overstates the true remaining time (no phantom extra minute).
@@ -130,7 +130,7 @@ enum CountdownFormatter {
         let number = value == value.rounded()
             ? String(Int(value))
             : String(format: "%.1f", value)
-        return "\(number) \(unit.compactLabel(for: value == 1 ? 1 : 2))"
+        return "\(number) \(unit.compactLabel(for: value == 1 ? 1 : 2))".capitalized
     }
 
     private static func menuBarUnit(for interval: TimeInterval) -> (CountdownUnit, TimeInterval) {
