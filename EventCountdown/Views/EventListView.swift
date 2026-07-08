@@ -397,6 +397,13 @@ struct EventListView: View {
         )
     }
 
+    // Single most-significant unit, e.g. "1 hour" or "45 minutes".
+    private func singleUnitCountdown(for date: Date, now: Date) -> String {
+        CountdownFormatter.format(
+            remaining: CountdownFormatter.remaining(until: date, now: now)
+        ).listText
+    }
+
     // Trailing status text for an event row: time until it starts (upcoming),
     // time until it ends (now / in progress), or how long ago it started (past).
     private func trailingCountdown(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
@@ -404,7 +411,7 @@ struct EventListView: View {
         case .upcoming:
             return fullCountdown(for: event.startDate, now: now)
         case .now:
-            return "ends in \(fullCountdown(for: event.endDate, now: now))"
+            return "ends in \(singleUnitCountdown(for: event.endDate, now: now))"
         case .past:
             return agoText(for: event.startDate, now: now)
         }
