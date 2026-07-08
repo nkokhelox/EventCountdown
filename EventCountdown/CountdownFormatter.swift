@@ -149,7 +149,8 @@ enum CountdownFormatter {
 
     static func agoText(elapsed interval: TimeInterval) -> String {
         if interval <= 0 { return "now" }
-        return "\(fullRemainingListText(remaining: interval)) ago"
+        // Single most-significant unit, e.g. "1 hour ago".
+        return "\(format(remaining: interval).listText) ago"
     }
 
     // Event-list countdown: the two most significant non-zero units, e.g.
