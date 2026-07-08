@@ -4,7 +4,8 @@ struct EmojiRulesEditor: View {
     @Bindable var store: EmojiMappingStore
     @State private var newMatchKind: EmojiRule.MatchKind = .titleContains
     @State private var newMatchValue = ""
-    @State private var newEmoji = "🎂"
+    @State private var newEmoji = ""
+    @State private var emojiShake: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -59,6 +60,16 @@ struct EmojiRulesEditor: View {
                 TextField("Match value", text: $newMatchValue)
                 TextField("Emoji", text: $newEmoji)
                     .frame(width: 50)
+                    .modifier(ShakeEffect(animatableData: emojiShake))
+                    .onChange(of: newEmoji) { _, value in
+                        // Accept a single emoji only: keep the first emoji character
+                        // and ignore anything extra or non-emoji, shaking to signal it.
+                        let allowed = value.first.flatMap { $0.isEmoji ? String($0) : nil } ?? ""
+                        if value != allowed {
+                            newEmoji = allowed
+                            withAnimation(.linear(duration: 0.3)) { emojiShake += 1 }
+                        }
+                    }
                 Button("Add") {
                     let rule = EmojiRule(
                         matchKind: newMatchKind,
@@ -80,6 +91,27 @@ struct EmojiRulesEditor: View {
                         .foregroundStyle(.orange)
                 }
             }
+        }
+    }
+}
+
+// Horizontal shake used to reject invalid emoji input.
+private struct ShakeEffect: GeometryEffect {
+    var travel: CGFloat = 6
+    var shakesPerUnit = 3
+    var animatableData: CGFloat
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let offset = travel * sin(animatableData * .pi * CGFloat(shakesPerUnit))
+        return ProjectionTransform(CGAffineTransform(translationX: offset, y: 0))
+    }
+}
+
+private extension Character {
+    var isEmoji: Bool {
+        unicodeScalars.contains { scalar in
+            scalar.properties.isEmojiPresentation
+                || (scalar.properties.isEmoji && scalar.value > 0x238C)
         }
     }
 }
