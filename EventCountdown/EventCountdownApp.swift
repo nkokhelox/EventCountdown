@@ -16,7 +16,7 @@ struct EventCountdownApp: App {
             MenuBarLabelView(
                 event: appModel.menuBarEvent,
                 resolution: appModel.menuBarEvent.map { appModel.emojiResolution(for: $0) } ?? .appIcon,
-                needsAcknowledgment: appModel.hasPendingAcknowledgment
+                hasStarted: appModel.menuBarEventHasStarted
             )
             .environment(appModel)
         }

@@ -17,7 +17,7 @@ EventCountdown/
   AppModel.swift               Observable app state (@Observable)
   CountdownFormatter.swift     Countdown math + list/menu-bar text formatting
   Models/                      CalendarEvent, EmojiRule, EventKey
-  Services/                    CalendarService, NotificationService, stores, coordinator
+  Services/                    CalendarService, EmojiMappingStore, LaunchAtLoginService
   Utilities/                   Emoji resolution, call-link parsing, panel metrics
   Views/                       EventListView (the panel), SettingsView, editors, labels
   Assets.xcassets/             App icon

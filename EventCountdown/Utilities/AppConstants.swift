@@ -2,18 +2,11 @@ import Foundation
 
 enum AppConstants {
     static let bundleID = "com.pisd.EventCountdown"
-    static let notificationPrefix = "eventcountdown."
+    // How long a started event keeps showing in the menu bar as "now" / "Late".
     static let ackWindowSeconds: TimeInterval = 5 * 60
+    // How long the menu bar shows "now" before switching to "Late".
     static let ackNowDisplaySeconds: TimeInterval = 60
     static let defaultPastEventWindowHours = 2
-    static let reminderIntervalSeconds: TimeInterval = {
-        #if DEBUG && DEBUG_SHORT_ACK_WINDOW
-        return 60
-        #else
-        return 15 * 60
-        #endif
-    }()
-    static let maxReminderChains = 10
     static let displayEventCount = 5
     static let panelHorizonDays = 7
     static let pastFetchHorizonDays = 30
@@ -24,8 +17,6 @@ enum AppConstants {
     static let countdownRoundsUpKey = "countdownRoundsUp"
     static let pastEventWindowHoursKey = "pastEventWindowHours"
     static let launchAtLoginKey = "launchAtLoginEnabled"
-    static let notificationsEnabledKey = "notificationsEnabled"
     static let enabledCalendarIDsKey = "enabledCalendarIDs"
     static let emojiRulesKey = "emojiRules"
-    static let ackStoreKey = "acknowledgmentStore"
 }

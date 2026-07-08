@@ -20,6 +20,12 @@ struct EventListView: View {
 
     private static let defaultExpandedDayCount = 2
 
+    private enum EventRowMode {
+        case upcoming
+        case now
+        case past
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !appModel.hasSeenFirstRunHint {
@@ -30,7 +36,6 @@ struct EventListView: View {
         }
         .frame(width: MenuBarPanelMetrics.panelWidth)
         .fixedSize(horizontal: false, vertical: true)
-        .frame(maxHeight: MenuBarPanelMetrics.maxPanelHeight(), alignment: .top)
     }
 
     private var maxScrollAreaHeight: CGFloat {
@@ -46,7 +51,7 @@ struct EventListView: View {
     }
 
     private var nonScrollChromeHeight: CGFloat {
-        var height: CGFloat = 40
+        var height: CGFloat = 40 // footer
         if !appModel.hasSeenFirstRunHint { height += 46 }
         return height
     }
@@ -81,7 +86,6 @@ struct EventListView: View {
             }
             .onPreferenceChange(ScrollContentHeightKey.self) { measuredScrollContentHeight = $0 }
 
-            Divider()
             footer
         }
         .onAppear(perform: applyDefaultDayCollapse)
@@ -93,7 +97,6 @@ struct EventListView: View {
     private func panelWithFooter<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             content()
-            Divider()
             footer
         }
     }
@@ -109,14 +112,17 @@ struct EventListView: View {
 
     @ViewBuilder
     private var eventsBody: some View {
+        // Re-evaluate every tick so events move between Upcoming/Now/Past the instant
+        // their start/end time passes (section lists are computed live off the clock).
+        let _ = appModel.tick
         VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
-            if let pending = appModel.ackStore.primaryPendingRecord {
-                pendingSection(pending)
-            }
-            if let past = appModel.calendarService.recentPastEvent {
+            if let past = visiblePastEvent {
                 pastSection(past)
             }
-            upcomingHeader
+            if !appModel.calendarService.nowEvents.isEmpty {
+                nowSection(appModel.calendarService.nowEvents, showsSettings: visiblePastEvent == nil)
+            }
+            upcomingHeader(showsSettings: visiblePastEvent == nil && appModel.calendarService.nowEvents.isEmpty)
             if appModel.calendarService.panelEvents.isEmpty {
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
@@ -144,90 +150,74 @@ struct EventListView: View {
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
-    private func pendingSection(_ record: AcknowledgmentRecord) -> some View {
-        let event = appModel.primaryPendingAcknowledgmentEvent ?? CalendarEvent(from: record.key)
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("Needs acknowledgment")
-                .font(.headline)
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(record.key.title).font(.body)
-                    Text(formattedStart(record.key.startDate)).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                pendingActions(for: event, key: record.key)
-            }
-            .padding(8)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    @ViewBuilder
-    private func pendingActions(for event: CalendarEvent, key: EventKey) -> some View {
-        if event.callLink != nil || event.mapLink != nil {
-            HStack(spacing: 12) {
-                if let mapLink = event.mapLink {
-                    Button {
-                        acknowledgeThenOpen(key: key, link: mapLink)
-                    } label: {
-                        Image(systemName: "mappin.and.ellipse")
-                    }
-                    .accessibilityLabel("Open Location")
-                }
-                if let callLink = event.callLink {
-                    Button {
-                        acknowledgeThenOpen(key: key, link: callLink)
-                    } label: {
-                        Image(systemName: "video")
-                    }
-                    .accessibilityLabel("Join Call")
-                }
-            }
-        } else {
-            Button("Acknowledge") {
-                Task { await appModel.acknowledge(key) }
-            }
-        }
-    }
-
-    private func acknowledgeThenOpen(key: EventKey, link: URL) {
-        Task {
-            await appModel.acknowledge(key)
-            NSWorkspace.shared.open(link)
-        }
+    // The recent past event while it is still within its display window, measured from
+    // when it finished. Tracked live off appModel.tick so it ages out on time.
+    private var visiblePastEvent: CalendarEvent? {
+        guard let past = appModel.calendarService.recentPastEvent else { return nil }
+        let elapsed = appModel.tick.timeIntervalSince(past.endDate)
+        let window = TimeInterval(appModel.pastEventWindowHours) * 60 * 60
+        return (elapsed >= 0 && elapsed <= window) ? past : nil
     }
 
     private func pastSection(_ event: CalendarEvent) -> some View {
-        // Only surface the past event while it is still recent — within the last hour.
-        // Wrapped in a TimelineView so it disappears live once it ages out.
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            if context.date.timeIntervalSince(event.startDate) <= TimeInterval(appModel.pastEventWindowHours) * 60 * 60 {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Past")
-                        .font(.headline)
-                    eventRow(event, showDivider: false, isPast: true)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Past")
+                    .font(.headline)
+                Spacer()
+                settingsButton
+            }
+            eventRow(event, showDivider: false, mode: .past)
+        }
+    }
+
+    private func nowSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Now")
+                    .font(.headline)
+                Spacer()
+                if showsSettings {
+                    settingsButton
                 }
+            }
+            ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                eventRow(event, showDivider: index < events.count - 1, mode: .now)
             }
         }
     }
 
-    private var upcomingHeader: some View {
+    private func upcomingHeader(showsSettings: Bool) -> some View {
         HStack {
             Text("Upcoming")
                 .font(.headline)
             Spacer()
-            Button {
-                isAddingEvent = true
-            } label: {
-                Image(systemName: "plus")
+            if showsSettings {
+                settingsButton
             }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("Add Event")
-            .popover(isPresented: $isAddingEvent, arrowEdge: .bottom) {
-                AddEventForm()
-                    .environment(appModel)
-            }
+        }
+    }
+
+    private var settingsButton: some View {
+        Button { showSettingsInForeground() } label: {
+            Image(systemName: "gearshape")
+        }
+        .buttonStyle(.borderless)
+        .help("Settings")
+        .accessibilityLabel("Settings")
+    }
+
+    private var addButton: some View {
+        Button {
+            isAddingEvent = true
+        } label: {
+            Image(systemName: "plus")
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Add Event")
+        .popover(isPresented: $isAddingEvent, arrowEdge: .top) {
+            AddEventForm()
+                .environment(appModel)
         }
     }
 
@@ -344,7 +334,7 @@ struct EventListView: View {
         return formatter.string(from: day)
     }
 
-    private func eventRow(_ event: CalendarEvent, showDivider: Bool, isPast: Bool = false) -> some View {
+    private func eventRow(_ event: CalendarEvent, showDivider: Bool, mode: EventRowMode = .upcoming) -> some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
@@ -357,12 +347,12 @@ struct EventListView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if let mapLink = event.mapLink {
-                            iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: isPast) {
+                            iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: mode == .past) {
                                 NSWorkspace.shared.open(mapLink)
                             }
                         }
                         if let callLink = event.callLink {
-                            iconLinkButton(system: "video", label: "Join Call", greyed: isPast) {
+                            iconLinkButton(system: "video", label: "Join Call", greyed: mode == .past) {
                                 NSWorkspace.shared.open(callLink)
                             }
                         }
@@ -373,9 +363,7 @@ struct EventListView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 8)
-                        Text(isPast
-                            ? agoText(for: event.startDate, now: context.date)
-                            : fullCountdown(for: event.startDate, now: context.date))
+                        Text(trailingCountdown(for: event, mode: mode, now: context.date))
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -409,6 +397,19 @@ struct EventListView: View {
             remaining: CountdownFormatter.remaining(until: date, now: now),
             roundUp: appModel.countdownRoundsUp
         )
+    }
+
+    // Trailing status text for an event row: time until it starts (upcoming),
+    // time until it ends (now / in progress), or how long ago it started (past).
+    private func trailingCountdown(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
+        switch mode {
+        case .upcoming:
+            return fullCountdown(for: event.startDate, now: now)
+        case .now:
+            return "ends in \(fullCountdown(for: event.endDate, now: now))"
+        case .past:
+            return agoText(for: event.startDate, now: now)
+        }
     }
 
     @ViewBuilder
@@ -465,19 +466,15 @@ struct EventListView: View {
 
     private var footer: some View {
         HStack {
-            Button { showSettingsInForeground() } label: {
-                Image(systemName: "gearshape")
-            }
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            addButton
             Spacer()
             Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power")
             }
+            .buttonStyle(.borderless)
             .help("Quit")
             .accessibilityLabel("Quit")
         }
-        .buttonStyle(.borderless)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
@@ -571,7 +568,6 @@ private struct AddEventForm: View {
                 end: end,
                 calendarID: calendarID.isEmpty ? nil : calendarID
             )
-            await appModel.resyncNotifications()
             dismiss()
         }
     }

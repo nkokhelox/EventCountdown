@@ -19,15 +19,33 @@ final class CalendarService {
     private var lastDailyRefresh: Date?
 
     private(set) var authorizationState: CalendarAuthorizationState = .notDetermined
-    private(set) var upcomingEvents: [CalendarEvent] = []
-    private(set) var recentPastEvent: CalendarEvent?
+    // All events fetched on the last refresh (past window + future), sorted by start.
+    // The section lists below are derived from this live, so an event moves between
+    // Upcoming / Now / Past the instant its start or end time passes — no refresh wait.
+    private(set) var fetchedEvents: [CalendarEvent] = []
     private(set) var allCalendars: [EKCalendar] = []
+
+    var upcomingEvents: [CalendarEvent] {
+        let now = Date()
+        return fetchedEvents.filter { $0.startDate > now }
+    }
+
+    // Events that have started but not yet ended (in progress right now).
+    var nowEvents: [CalendarEvent] {
+        let now = Date()
+        return fetchedEvents.filter { $0.startDate <= now && $0.endDate > now }
+    }
+
+    var recentPastEvent: CalendarEvent? {
+        let now = Date()
+        return fetchedEvents.filter { $0.endDate <= now }.max { $0.endDate < $1.endDate }
+    }
     var enabledCalendarIDs: Set<String> {
         didSet { UserDefaults.standard.set(Array(enabledCalendarIDs), forKey: AppConstants.enabledCalendarIDsKey) }
     }
 
     var nextEvent: CalendarEvent? {
-        upcomingEvents.first { $0.startDate > Date() || isEffectivelyActive($0) }
+        upcomingEvents.first { $0.startDate > Date() }
     }
 
     var displayEvents: [CalendarEvent] {
@@ -51,12 +69,9 @@ final class CalendarService {
         Array(upcomingEvents.prefix(AppConstants.scheduleEventCount))
     }
 
-    private let pendingKeysProvider: () -> Set<String>
-
-    init(pendingKeysProvider: @escaping () -> Set<String> = { [] }) {
+    init() {
         let saved = UserDefaults.standard.stringArray(forKey: AppConstants.enabledCalendarIDsKey) ?? []
         enabledCalendarIDs = Set(saved)
-        self.pendingKeysProvider = pendingKeysProvider
         authorizationState = currentAuthorizationState()
     }
 
@@ -162,7 +177,7 @@ final class CalendarService {
     func refresh() async {
         authorizationState = currentAuthorizationState()
         guard authorizationState == .authorized else {
-            upcomingEvents = []
+            fetchedEvents = []
             allCalendars = []
             return
         }
@@ -180,19 +195,10 @@ final class CalendarService {
         let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: calendars)
         let ekEvents = eventStore.events(matching: predicate)
 
-        let pendingKeys = pendingKeysProvider()
-        let allEvents = ekEvents.map(CalendarEvent.init(from:))
-        upcomingEvents = allEvents
-            .filter { $0.startDate > now || pendingKeys.contains($0.eventKey.storageKey) }
+        fetchedEvents = ekEvents
+            .map(CalendarEvent.init(from:))
             .sorted { $0.startDate < $1.startDate }
-        recentPastEvent = allEvents
-            .filter { $0.startDate <= now && !pendingKeys.contains($0.eventKey.storageKey) }
-            .max { $0.startDate < $1.startDate }
         lastDailyRefresh = now
-    }
-
-    private func isEffectivelyActive(_ event: CalendarEvent) -> Bool {
-        pendingKeysProvider().contains(event.eventKey.storageKey)
     }
 
     private func currentAuthorizationState() -> CalendarAuthorizationState {

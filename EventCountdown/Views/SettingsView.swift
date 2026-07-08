@@ -4,6 +4,12 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppModel.self) private var appModel
 
+    private let countdownUnitFacts = [
+        "1 year = 365 days",
+        "1 month = 30 days",
+        "1 week = 7 days",
+    ]
+
     var body: some View {
         TabView {
             calendarsTab
@@ -47,7 +53,6 @@ struct SettingsView: View {
                 }
                 Task {
                     await appModel.calendarService.refresh()
-                    await appModel.resyncNotifications()
                 }
             }
         )
@@ -74,75 +79,55 @@ struct SettingsView: View {
                 }
 
                 aboutSettingsGroup(title: "Events", systemImage: "hand.tap") {
-                    Picker("Open Calendar on", selection: Binding(
-                        get: { appModel.openCalendarOnSingleClick },
-                        set: { appModel.openCalendarOnSingleClick = $0 }
-                    )) {
-                        Text("Double click").tag(false)
-                        Text("Single click").tag(true)
+                    eventsSubgroup(
+                        "Open Calendar on",
+                        description: "Choose whether clicking or double-clicking an event opens Calendar to that day."
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { appModel.openCalendarOnSingleClick },
+                            set: { appModel.openCalendarOnSingleClick = $0 }
+                        )) {
+                            Text("Double click").tag(false)
+                            Text("Single click").tag(true)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.radioGroup)
-                    Text("Choose whether clicking or double-clicking an event opens Calendar to that day.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
 
-                    Divider()
-
-                    Picker("Remaining time", selection: Binding(
-                        get: { appModel.countdownRoundsUp },
-                        set: { appModel.countdownRoundsUp = $0 }
-                    )) {
-                        Text("Round down").tag(false)
-                        Text("Round up").tag(true)
+                    eventsSubgroup(
+                        "Remaining time",
+                        description: "Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\"."
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { appModel.countdownRoundsUp },
+                            set: { appModel.countdownRoundsUp = $0 }
+                        )) {
+                            Text("Round down").tag(false)
+                            Text("Round up").tag(true)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
                     }
-                    .pickerStyle(.radioGroup)
-                    Text("Round down shows \"1 hour\" with 1.5 hours left; round up shows \"2 hours\".")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
 
-                    Divider()
-
-                    Picker("Show past event for", selection: Binding(
-                        get: { appModel.pastEventWindowHours },
-                        set: { appModel.pastEventWindowHours = $0 }
-                    )) {
-                        Text("1 hour").tag(1)
-                        Text("2 hours").tag(2)
-                        Text("4 hours").tag(4)
-                        Text("8 hours").tag(8)
-                    }
-                    .pickerStyle(.menu)
-                    Text("How long a just-passed event stays in the panel's Past section.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                aboutSettingsGroup(title: "Notifications", systemImage: "bell") {
-                    Toggle("Enable notifications", isOn: Binding(
-                        get: { appModel.notificationService.isEnabled },
-                        set: { appModel.notificationService.isEnabled = $0; Task { await appModel.resyncNotifications() } }
-                    ))
-                    if !appModel.notificationService.permissionGranted {
-                        Text("Notifications are disabled in System Settings.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Button("Open Notification Settings") { openNotificationSettings() }
-                    }
-                    Text("Schedules the next event notification after the current one is acknowledged or expires.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Shows \"now\" for 1 minute after start, then \"Late\" for up to 5 minutes in the menu bar.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if appModel.notificationService.isEnabled && !appModel.launchAtLoginService.isEnabled {
-                        Text("Tip: enable Run at startup for menu bar countdown and in-app reminders.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    eventsSubgroup(
+                        "Show past event for",
+                        description: "How long a just-passed event stays in the panel's Past section."
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { appModel.pastEventWindowHours },
+                            set: { appModel.pastEventWindowHours = $0 }
+                        )) {
+                            Text("1 hour").tag(1)
+                            Text("2 hours").tag(2)
+                            Text("4 hours").tag(4)
+                            Text("8 hours").tag(8)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
                     }
                 }
 
-
-                aboutDetailsFooter
+                aboutInfoCard
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -151,22 +136,59 @@ struct SettingsView: View {
         .onAppear { appModel.launchAtLoginService.syncStatus() }
     }
 
-    private var aboutDetailsFooter: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Divider()
-            Text("EventCountdown")
-                .font(.headline)
-            Text("Countdown units use fixed durations: 1 year = 365 days, 1 month = 30 days, 1 week = 7 days. This keeps boundaries consistent but differs from calendar months.")
+    private var aboutInfoCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            if let icon = AppIconRenderer.image(pointSize: 56) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .frame(width: 56, height: 56)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("EventCountdown")
+                        .font(.title2.weight(.semibold))
+                    Spacer(minLength: 8)
+                    if let version = appVersionText {
+                        Text(version)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("The units of measure we use are fixed for simplicity")
+                    .font(.subheadline.weight(.semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(countdownUnitFacts, id: \.self) { fact in
+                        Text(fact)
+                    }
+                }
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            #if DEBUG && DEBUG_SHORT_ACK_WINDOW
-            Text("DEBUG: DEBUG_SHORT_ACK_WINDOW is enabled for legacy reminder cleanup constants.")
-                .font(.caption)
-                .foregroundStyle(.orange)
-            #endif
+                Text("This keeps boundaries consistent but differs from calendar months.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private var appVersionText: String? {
+        let info = Bundle.main.infoDictionary
+        guard let short = info?["CFBundleShortVersionString"] as? String else { return nil }
+        if let build = info?["CFBundleVersion"] as? String, build != short {
+            return "Version \(short) (\(build))"
+        }
+        return "Version \(short)"
     }
 
     private func aboutSettingsGroup<Content: View>(
@@ -194,9 +216,31 @@ struct SettingsView: View {
         }
     }
 
-    private func openNotificationSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
-            NSWorkspace.shared.open(url)
+    // A titled sub-section inside a settings group: the setting name is the subgroup
+    // title, with the control (radio buttons) and its description subtext inside.
+    private func eventsSubgroup<Content: View>(
+        _ title: String,
+        description: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            content()
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
         }
     }
 }

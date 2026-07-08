@@ -14,9 +14,6 @@
 		A10000000000000000000005 /* EmojiRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* EmojiRule.swift */; };
 		A10000000000000000000006 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* CalendarService.swift */; };
 		A10000000000000000000007 /* EmojiMappingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* EmojiMappingStore.swift */; };
-		A10000000000000000000008 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* NotificationService.swift */; };
-		A10000000000000000000009 /* AcknowledgmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* AcknowledgmentStore.swift */; };
-		A10000000000000000000010 /* EventFireCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* EventFireCoordinator.swift */; };
 		A10000000000000000000011 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* LaunchAtLoginService.swift */; };
 		A10000000000000000000012 /* MenuBarLabelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* MenuBarLabelView.swift */; };
 		A10000000000000000000013 /* EventListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* EventListView.swift */; };
@@ -28,6 +25,7 @@
 		A10000000000000000000019 /* CountdownFormatter.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* CountdownFormatter.swift */; };
 		A10000000000000000000027 /* EventCallLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* EventCallLinkTests.swift */; };
 		A10000000000000000000028 /* EventCallLink.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* EventCallLink.swift */; };
+		A1000000000000000000002A /* AppConstants.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* AppConstants.swift */; };
 		A10000000000000000000020 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* AppDelegate.swift */; };
 		A10000000000000000000021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* Assets.xcassets */; };
 		A10000000000000000000024 /* MenuBarPanelMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* MenuBarPanelMetrics.swift */; };
@@ -54,9 +52,6 @@
 		A20000000000000000000005 /* EmojiRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiRule.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* CalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* EmojiMappingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiMappingStore.swift; sourceTree = "<group>"; };
-		A20000000000000000000008 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		A20000000000000000000009 /* AcknowledgmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgmentStore.swift; sourceTree = "<group>"; };
-		A20000000000000000000010 /* EventFireCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFireCoordinator.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		A20000000000000000000012 /* MenuBarLabelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabelView.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* EventListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventListView.swift; sourceTree = "<group>"; };
@@ -153,9 +148,6 @@
 			children = (
 				A20000000000000000000006 /* CalendarService.swift */,
 				A20000000000000000000007 /* EmojiMappingStore.swift */,
-				A20000000000000000000008 /* NotificationService.swift */,
-				A20000000000000000000009 /* AcknowledgmentStore.swift */,
-				A20000000000000000000010 /* EventFireCoordinator.swift */,
 				A20000000000000000000011 /* LaunchAtLoginService.swift */,
 			);
 			path = Services;
@@ -274,9 +266,6 @@
 				A10000000000000000000005 /* EmojiRule.swift in Sources */,
 				A10000000000000000000006 /* CalendarService.swift in Sources */,
 				A10000000000000000000007 /* EmojiMappingStore.swift in Sources */,
-				A10000000000000000000008 /* NotificationService.swift in Sources */,
-				A10000000000000000000009 /* AcknowledgmentStore.swift in Sources */,
-				A10000000000000000000010 /* EventFireCoordinator.swift in Sources */,
 				A10000000000000000000011 /* LaunchAtLoginService.swift in Sources */,
 				A10000000000000000000012 /* MenuBarLabelView.swift in Sources */,
 				A10000000000000000000013 /* EventListView.swift in Sources */,
@@ -299,6 +288,7 @@
 				A10000000000000000000027 /* EventCallLinkTests.swift in Sources */,
 				A10000000000000000000019 /* CountdownFormatter.swift in Tests */,
 				A10000000000000000000028 /* EventCallLink.swift in Tests */,
+				A1000000000000000000002A /* AppConstants.swift in Tests */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

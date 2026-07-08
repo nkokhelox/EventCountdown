@@ -5,7 +5,7 @@ struct MenuBarLabelView: View {
     @Environment(AppModel.self) private var appModel
     let event: CalendarEvent?
     let resolution: EventEmojiResolution
-    let needsAcknowledgment: Bool
+    let hasStarted: Bool
 
     private let labelFont = Font.system(size: 13)
 
@@ -29,8 +29,8 @@ struct MenuBarLabelView: View {
             return mark.map { $0 + Text(verbatim: " —") } ?? Text(verbatim: "—")
         }
 
-        if needsAcknowledgment {
-            return (mark ?? Text(verbatim: "")) + Text(verbatim: " \(acknowledgmentText(for: event))")
+        if hasStarted {
+            return (mark ?? Text(verbatim: "")) + Text(verbatim: " \(ongoingText(for: event))")
         }
 
         return (mark ?? Text(verbatim: "")) + Text(verbatim: " \(countdownText(for: event))")
@@ -47,9 +47,9 @@ struct MenuBarLabelView: View {
         return nil
     }
 
-    private func acknowledgmentText(for event: CalendarEvent) -> String {
+    private func ongoingText(for event: CalendarEvent) -> String {
         let elapsed = appModel.tick.timeIntervalSince(event.startDate)
-        return CountdownFormatter.menuBarAcknowledgmentLabel(elapsedSinceStart: elapsed)
+        return CountdownFormatter.ongoingLabel(elapsedSinceStart: elapsed)
     }
 
     private func countdownText(for event: CalendarEvent) -> String {

@@ -24,18 +24,6 @@ struct EventKey: Hashable, Codable, Sendable {
         "\(eventIdentifier)|\(startDate.timeIntervalSince1970)"
     }
 
-    var notificationID: String {
-        AppConstants.notificationPrefix + storageKey.replacingOccurrences(of: "|", with: ".")
-    }
-
-    func reminderNotificationID(index: Int) -> String {
-        "\(notificationID).reminder.\(index)"
-    }
-
-    var expireNotificationID: String {
-        "\(notificationID).expire"
-    }
-
     func matches(snapshot: EventKey) -> Bool {
         if eventIdentifier == snapshot.eventIdentifier && startDate == snapshot.startDate {
             return true

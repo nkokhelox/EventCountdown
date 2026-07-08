@@ -5,8 +5,6 @@ import Observation
 final class AppModel {
     let calendarService: CalendarService
     let emojiStore: EmojiMappingStore
-    let ackStore: AcknowledgmentStore
-    let notificationService: NotificationService
     let launchAtLoginService: LaunchAtLoginService
 
     var hasSeenFirstRunHint: Bool {
@@ -27,9 +25,7 @@ final class AppModel {
     }
 
     init() {
-        ackStore = AcknowledgmentStore()
         emojiStore = EmojiMappingStore()
-        notificationService = NotificationService(ackStore: ackStore)
         launchAtLoginService = LaunchAtLoginService()
         hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
         openCalendarOnSingleClick = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey)
@@ -37,13 +33,7 @@ final class AppModel {
         let storedPastWindowHours = UserDefaults.standard.integer(forKey: AppConstants.pastEventWindowHoursKey)
         pastEventWindowHours = storedPastWindowHours == 0 ? AppConstants.defaultPastEventWindowHours : storedPastWindowHours
 
-        let ack = ackStore
-        calendarService = CalendarService(pendingKeysProvider: {
-            if let key = ack.primaryPendingRecord?.key.storageKey {
-                return [key]
-            }
-            return []
-        })
+        calendarService = CalendarService()
     }
 
     private var didBootstrap = false
@@ -53,34 +43,12 @@ final class AppModel {
         guard !didBootstrap else { return }
         didBootstrap = true
         calendarService.start()
-        notificationService.start()
-        notificationService.onAcknowledged = { [weak self] key in
-            await self?.acknowledge(key)
-        }
         if calendarService.authorizationState == .notDetermined {
             await calendarService.requestAccess()
         } else {
             await calendarService.refresh()
         }
-        await notificationService.restoreOnLaunch(events: calendarService.upcomingEvents) { [weak self] event in
-            self?.emojiResolution(for: event) ?? .appIcon
-        }
-        await resyncNotifications()
         startTickLoop()
-    }
-
-    @MainActor
-    func resyncNotifications() async {
-        await notificationService.scheduleUpcoming(events: calendarService.scheduleEvents) { [weak self] event in
-            self?.emojiResolution(for: event) ?? .appIcon
-        }
-    }
-
-    @MainActor
-    func acknowledge(_ key: EventKey) async {
-        await notificationService.acknowledge(key)
-        tick = Date()
-        await resyncNotifications()
     }
 
     func emojiResolution(for event: CalendarEvent) -> EventEmojiResolution {
@@ -96,18 +64,27 @@ final class AppModel {
         return calendarService.upcomingEvents.first { $0.startDate > now }
     }
 
-    var primaryPendingAcknowledgmentEvent: CalendarEvent? {
-        guard let record = ackStore.primaryPendingRecord else { return nil }
-        return calendarService.upcomingEvents.first { $0.eventKey.matches(snapshot: record.key) }
-            ?? CalendarEvent(from: record.key)
+    // The currently in-progress event (most recently started, if several overlap).
+    // Drives the menu bar "now" / "ongoing" label for the whole time it is running,
+    // until its end time passes and it leaves nowEvents.
+    var ongoingEvent: CalendarEvent? {
+        calendarService.nowEvents.max { $0.startDate < $1.startDate }
+    }
+
+    // When the next upcoming event starts before the in-progress event ends, the two
+    // overlap — surface the next event's countdown so you can see when it begins.
+    var overlappingNextEvent: CalendarEvent? {
+        guard let ongoing = ongoingEvent, let next = nextCountdownEvent else { return nil }
+        return next.startDate < ongoing.endDate ? next : nil
     }
 
     var menuBarEvent: CalendarEvent? {
-        primaryPendingAcknowledgmentEvent ?? nextCountdownEvent
+        if let overlappingNextEvent { return overlappingNextEvent }
+        return ongoingEvent ?? nextCountdownEvent
     }
 
-    var hasPendingAcknowledgment: Bool {
-        ackStore.primaryPendingRecord != nil
+    var menuBarEventHasStarted: Bool {
+        overlappingNextEvent == nil && ongoingEvent != nil
     }
 
     private(set) var tick = Date()
@@ -115,13 +92,7 @@ final class AppModel {
     @MainActor
     private func startTickLoop() {
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                self.tick = Date()
-                await self.notificationService.handleTick(events: self.calendarService.upcomingEvents) { event in
-                    self.emojiResolution(for: event)
-                }
-            }
+            self?.tick = Date()
         }
     }
 }

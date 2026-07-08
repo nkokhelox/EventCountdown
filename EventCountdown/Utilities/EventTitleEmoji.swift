@@ -28,7 +28,7 @@ enum EventTitleEmoji {
         if let calendarEmoji = leadingEmoji(in: event.calendarTitle) {
             return EventEmojiResolution(character: calendarEmoji)
         }
-        return .appIcon
+        return EventEmojiResolution(character: "🗓️")
     }
 
     static func firstWord(of title: String) -> String? {
