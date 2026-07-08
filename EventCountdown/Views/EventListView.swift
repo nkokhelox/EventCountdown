@@ -388,7 +388,7 @@ struct EventListView: View {
     private func shortCountdown(for date: Date, now: Date) -> String {
         CountdownFormatter.menuBarDecimalText(
             remaining: CountdownFormatter.remaining(until: date, now: now)
-        )
+        ).lowercased()
     }
 
     private func fullCountdown(for date: Date, now: Date) -> String {
