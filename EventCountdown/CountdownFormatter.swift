@@ -25,11 +25,11 @@ enum CountdownUnit: String, CaseIterable {
     func compactLabel(for value: Int) -> String {
         let plural = value != 1
         switch self {
-        case .years: return plural ? "yrs" : "yr"
-        case .months: return plural ? "mos" : "mo"
-        case .weeks: return plural ? "wks" : "wk"
+        case .years: return plural ? "years" : "year"
+        case .months: return plural ? "mons" : "mon"
+        case .weeks: return plural ? "weeks" : "week"
         case .days: return plural ? "days" : "day"
-        case .hours: return plural ? "hrs" : "hr"
+        case .hours: return plural ? "hours" : "hour"
         case .minutes: return plural ? "mins" : "min"
         case .seconds: return plural ? "secs" : "sec"
         }

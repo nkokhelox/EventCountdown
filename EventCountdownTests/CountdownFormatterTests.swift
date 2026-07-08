@@ -76,7 +76,7 @@ final class CountdownFormatterTests: XCTestCase {
 
     func testMenuBarTextUsesCompactPluralHours() {
         let value = CountdownFormatter.format(remaining: 2 * hour)
-        XCTAssertEqual(value.menuBarText, "2 hrs")
+        XCTAssertEqual(value.menuBarText, "2 hours")
     }
 
     func testFullRemainingListTextIncludesHoursAndMinutes() {
@@ -97,7 +97,7 @@ final class CountdownFormatterTests: XCTestCase {
     func testMenuBarDecimalTextIsCapitalized() {
         XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 30), "30 Secs")
         XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 2 * minute), "2 Mins")
-        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: hour + 30 * minute), "1.5 Hrs")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: hour + 30 * minute), "1.5 Hours")
         XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: minute), "1 Min")
     }
 }
