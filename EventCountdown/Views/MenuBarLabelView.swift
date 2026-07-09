@@ -30,7 +30,7 @@ struct MenuBarLabelView: View {
     // it starts (upcoming) or ends (in progress). Same-day events show the time only;
     // other days include a short date so the time isn't ambiguous.
     private var tooltipText: String {
-        guard let event else { return "" }
+        guard let event else { return "Add a calendar with events" }
         let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let date = hasStarted ? event.endDate : event.startDate
         let formatter = Calendar.current.isDateInToday(date) ? Self.tooltipTimeFormatter : Self.tooltipDateTimeFormatter
@@ -54,7 +54,7 @@ struct MenuBarLabelView: View {
         let mark = menuBarMarkText
 
         guard let event else {
-            return mark.map { $0 + Text(verbatim: " —") } ?? Text(verbatim: "—")
+            return mark.map { $0 + Text(verbatim: " 0 events") } ?? Text(verbatim: "0 events")
         }
 
         if hasStarted {
