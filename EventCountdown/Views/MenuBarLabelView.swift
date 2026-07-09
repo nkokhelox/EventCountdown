@@ -10,17 +10,45 @@ struct MenuBarLabelView: View {
     private let labelFont = Font.system(size: 13)
 
     var body: some View {
+        // Read tick so the label re-renders every second, keeping the countdown and the
+        // "Now"/"Ongoing" text fresh.
         let _ = appModel.tick
+        styledLabel
+            .overlay {
+                MenuBarNativeTooltip(title: tooltipText)
+            }
+    }
+
+    private var styledLabel: some View {
         menuBarLabel
             .font(labelFont)
             .monospacedDigit()
             .lineLimit(1)
-            .overlay {
-                MenuBarNativeTooltip(
-                    title: appModel.menuBarEvent?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                )
-            }
     }
+
+    // Menu bar hover tooltip, e.g. "eat starts @ 12:00": the event name followed by when
+    // it starts (upcoming) or ends (in progress). Same-day events show the time only;
+    // other days include a short date so the time isn't ambiguous.
+    private var tooltipText: String {
+        guard let event else { return "" }
+        let title = event.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let date = hasStarted ? event.endDate : event.startDate
+        let formatter = Calendar.current.isDateInToday(date) ? Self.tooltipTimeFormatter : Self.tooltipDateTimeFormatter
+        let detail = "\(hasStarted ? "ends" : "starts") @ \(formatter.string(from: date))"
+        return title.isEmpty ? detail : "\(title) \(detail)"
+    }
+
+    private static let tooltipTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
+
+    private static let tooltipDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMMdjm")
+        return formatter
+    }()
 
     private var menuBarLabel: Text {
         let mark = menuBarMarkText
