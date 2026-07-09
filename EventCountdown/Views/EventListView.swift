@@ -210,11 +210,8 @@ struct EventListView: View {
                     settingsButton
                 }
             }
-            // Only tint the Next rows red when there is a start-time conflict (more than
-            // one). A single next event sits in the section untinted.
-            let mode: EventRowMode = events.count > 1 ? .next : .upcoming
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
-                eventRow(event, showDivider: index < events.count - 1, mode: mode)
+                eventRow(event, showDivider: index < events.count - 1, mode: .next)
             }
         }
     }
@@ -410,7 +407,7 @@ struct EventListView: View {
                     }
 
                     HStack(spacing: 8) {
-                        Text(formattedStart(event.startDate))
+                        Text(rowSubtitle(for: event, mode: mode, now: context.date))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 8)
@@ -453,7 +450,8 @@ struct EventListView: View {
     private func rowTint(for mode: EventRowMode, event: CalendarEvent) -> Color {
         switch mode {
         case .now: return Color.red.opacity(0.12)
-        case .next: return Color.red.opacity(0.22)
+        // Deeper red only when there is a start-time conflict (more than one Next event).
+        case .next: return nextEvents.count > 1 ? Color.red.opacity(0.22) : .clear
         default: return .clear
         }
     }
@@ -554,6 +552,38 @@ struct EventListView: View {
         formatter.setLocalizedDateFormatFromTemplate("\(dateTemplate)jm")
         return formatter.string(from: date)
     }
+
+    // Row subtitle: upcoming rows show the start date-time; the Next event shows
+    // "at <start> for <length>"; an ongoing event shows how much of it is left; a past
+    // event shows the time it ended.
+    private func rowSubtitle(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
+        switch mode {
+        case .next:
+            return nextStartAndDuration(event)
+        case .now:
+            if event.isAllDay { return "all day" }
+            return "\(CountdownFormatter.durationText(event.endDate.timeIntervalSince(now))) left"
+        case .past:
+            return event.isAllDay ? "all day" : Self.timeFormatter.string(from: event.endDate)
+        case .upcoming:
+            return formattedStart(event.startDate)
+        }
+    }
+
+    // Next-event subtitle: start time and length, e.g. "at 12:00 for 1 hr 30 mins".
+    // All-day events just read "all day".
+    private func nextStartAndDuration(_ event: CalendarEvent) -> String {
+        if event.isAllDay { return "all day" }
+        let time = Self.timeFormatter.string(from: event.startDate)
+        let duration = CountdownFormatter.durationText(event.endDate.timeIntervalSince(event.startDate))
+        return "at \(time) for \(duration)"
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("jm")
+        return formatter
+    }()
 }
 
 private struct DayEventGroup: Identifiable {

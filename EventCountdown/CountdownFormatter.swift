@@ -147,6 +147,20 @@ enum CountdownFormatter {
         date.timeIntervalSince(now)
     }
 
+    // Length of an event, e.g. "45 mins", "1 hr 30 mins", "2 days 3 hrs". Zero units are
+    // dropped; a zero-length span reads "0 mins".
+    static func durationText(_ interval: TimeInterval) -> String {
+        let totalMinutes = max(0, Int(interval / 60))
+        let days = totalMinutes / (24 * 60)
+        let hours = (totalMinutes % (24 * 60)) / 60
+        let minutes = totalMinutes % 60
+        var parts: [String] = []
+        if days > 0 { parts.append("\(days) \(days == 1 ? "day" : "days")") }
+        if hours > 0 { parts.append("\(hours) \(hours == 1 ? "hr" : "hrs")") }
+        if minutes > 0 { parts.append("\(minutes) \(minutes == 1 ? "min" : "mins")") }
+        return parts.isEmpty ? "0 mins" : parts.joined(separator: " ")
+    }
+
     static func agoText(elapsed interval: TimeInterval) -> String {
         if interval <= 0 { return "now" }
         // Single most-significant unit, e.g. "1 hour ago".
