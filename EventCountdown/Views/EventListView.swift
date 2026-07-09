@@ -258,9 +258,30 @@ struct EventListView: View {
         }
     }
 
+    // Source events for the panel's Next + Upcoming sections: normally the horizon window,
+    // but if that has no events, fall back to any upcoming events across up to a capped
+    // number of distinct event-days so the panel is never blank when events exist further
+    // out than the horizon.
+    private var panelSourceEvents: [CalendarEvent] {
+        let horizon = appModel.calendarService.panelEvents
+        if !horizon.isEmpty { return horizon }
+        let calendar = Calendar.current
+        var seenDays: [Date] = []
+        var result: [CalendarEvent] = []
+        for event in appModel.calendarService.upcomingEvents {
+            let day = calendar.startOfDay(for: event.startDate)
+            if !seenDays.contains(day) {
+                if seenDays.count == AppConstants.fallbackUpcomingEventDays { break }
+                seenDays.append(day)
+            }
+            result.append(event)
+        }
+        return result
+    }
+
     private var panelEventsSpanMultipleYears: Bool {
         let calendar = Calendar.current
-        let years = Set(appModel.calendarService.panelEvents.map {
+        let years = Set(panelSourceEvents.map {
             calendar.component(.year, from: $0.startDate)
         })
         return years.count > 1
@@ -273,7 +294,7 @@ struct EventListView: View {
     private var nextEvents: [CalendarEvent] {
         let windowHours = appModel.nextEventWindowHours
         guard windowHours > 0 else { return [] } // Never: no Next section
-        let events = appModel.calendarService.panelEvents
+        let events = panelSourceEvents
         guard let first = events.first else { return [] }
         let window = TimeInterval(windowHours) * 60 * 60
         guard first.startDate.timeIntervalSince(appModel.tick) <= window else { return [] }
@@ -283,7 +304,7 @@ struct EventListView: View {
 
     // Upcoming panel events excluding the Next run — these are grouped by day below.
     private var remainingPanelEvents: [CalendarEvent] {
-        Array(appModel.calendarService.panelEvents.dropFirst(nextEvents.count))
+        Array(panelSourceEvents.dropFirst(nextEvents.count))
     }
 
     private var groupedPanelEvents: [DayEventGroup] {

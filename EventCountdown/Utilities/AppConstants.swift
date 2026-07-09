@@ -10,6 +10,9 @@ enum AppConstants {
     static let defaultNextEventWindowHours = 2
     static let displayEventCount = 5
     static let panelHorizonDays = 7
+    // When the horizon window has no events, fall back to any upcoming events across up
+    // to this many distinct event-days so the panel is not left blank.
+    static let fallbackUpcomingEventDays = 20
     static let pastFetchHorizonDays = 30
     static let scheduleEventCount = 20
     static let fetchHorizonYears = 3
