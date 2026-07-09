@@ -12,6 +12,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Events Countdown</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -23,11 +25,11 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>EventCountdown asks Calendar to open to the date of a selected event.</string>
+	<string>Events Countdown asks Calendar to open to the date of a selected event.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>EventCountdown reads your upcoming calendar events to show menu bar countdowns.</string>
+	<string>Events Countdown reads your upcoming calendar events to show menu bar countdowns.</string>
 	<key>NSCalendarsUsageDescription</key>
-	<string>EventCountdown reads your upcoming calendar events to show menu bar countdowns.</string>
+	<string>Events Countdown reads your upcoming calendar events to show menu bar countdowns.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026</string>
 </dict>

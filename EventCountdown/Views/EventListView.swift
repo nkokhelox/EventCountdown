@@ -148,7 +148,7 @@ struct EventListView: View {
 
     private var firstRunHint: some View {
         HStack {
-            Text("EventCountdown lives in your menu bar.")
+            Text("Events Countdown lives in your menu bar.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()

@@ -144,7 +144,7 @@ struct SettingsView: View {
     private var aboutInfoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text("EventCountdown")
+                Text("Events Countdown")
                     .font(.title2.weight(.semibold))
                 Spacer(minLength: 8)
                 if let version = appVersionText {
