@@ -22,6 +22,7 @@ struct EventListView: View {
 
     private enum EventRowMode {
         case upcoming
+        case next
         case now
         case past
     }
@@ -115,19 +116,27 @@ struct EventListView: View {
         // Re-evaluate every tick so events move between Upcoming/Now/Past the instant
         // their start/end time passes (section lists are computed live off the clock).
         let _ = appModel.tick
+        let past = visiblePastEvent
+        let nowEvents = appModel.calendarService.nowEvents
+        let next = nextEvents
+        let remaining = remainingPanelEvents
         VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
-            if let past = visiblePastEvent {
+            if let past {
                 pastSection(past)
             }
-            if !appModel.calendarService.nowEvents.isEmpty {
-                nowSection(appModel.calendarService.nowEvents, showsSettings: visiblePastEvent == nil)
+            if !nowEvents.isEmpty {
+                nowSection(nowEvents, showsSettings: past == nil)
             }
-            upcomingHeader(showsSettings: visiblePastEvent == nil && appModel.calendarService.nowEvents.isEmpty)
-            if appModel.calendarService.panelEvents.isEmpty {
+            if !next.isEmpty {
+                nextSection(next, showsSettings: past == nil && nowEvents.isEmpty)
+            }
+            if !remaining.isEmpty {
+                upcomingHeader(showsSettings: past == nil && nowEvents.isEmpty && next.isEmpty)
+                upcomingEventsList
+            } else if next.isEmpty {
+                upcomingHeader(showsSettings: past == nil && nowEvents.isEmpty)
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
-            } else {
-                upcomingEventsList
             }
         }
         .padding(.horizontal, 12)
@@ -153,6 +162,7 @@ struct EventListView: View {
     // The recent past event while it is still within its display window, measured from
     // when it finished. Tracked live off appModel.tick so it ages out on time.
     private var visiblePastEvent: CalendarEvent? {
+        guard appModel.pastEventWindowHours > 0 else { return nil } // Off: never show a past event
         guard let past = appModel.calendarService.recentPastEvent else { return nil }
         let elapsed = appModel.tick.timeIntervalSince(past.endDate)
         let window = TimeInterval(appModel.pastEventWindowHours) * 60 * 60
@@ -183,6 +193,28 @@ struct EventListView: View {
             }
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
                 eventRow(event, showDivider: index < events.count - 1, mode: .now)
+            }
+        }
+    }
+
+    // The soonest upcoming event(s). Usually one; when several share the exact same
+    // earliest start time (a start-time conflict) they all appear here, tinted a deeper
+    // red than the ongoing "Now" rows.
+    private func nextSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Next")
+                    .font(.headline)
+                Spacer()
+                if showsSettings {
+                    settingsButton
+                }
+            }
+            // Only tint the Next rows red when there is a start-time conflict (more than
+            // one). A single next event sits in the section untinted.
+            let mode: EventRowMode = events.count > 1 ? .next : .upcoming
+            ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                eventRow(event, showDivider: index < events.count - 1, mode: mode)
             }
         }
     }
@@ -237,12 +269,25 @@ struct EventListView: View {
         return years.count > 1
     }
 
+    // The soonest upcoming event and any others starting at the exact same time.
+    // panelEvents is sorted by start ascending, so these are its leading equal-start run.
+    private var nextEvents: [CalendarEvent] {
+        let events = appModel.calendarService.panelEvents
+        guard let firstStart = events.first?.startDate else { return [] }
+        return Array(events.prefix { $0.startDate == firstStart })
+    }
+
+    // Upcoming panel events excluding the Next run — these are grouped by day below.
+    private var remainingPanelEvents: [CalendarEvent] {
+        Array(appModel.calendarService.panelEvents.dropFirst(nextEvents.count))
+    }
+
     private var groupedPanelEvents: [DayEventGroup] {
         let calendar = Calendar.current
         var groups: [Date: [CalendarEvent]] = [:]
         var order: [Date] = []
 
-        for event in appModel.calendarService.panelEvents {
+        for event in remainingPanelEvents {
             let day = calendar.startOfDay(for: event.startDate)
             if groups[day] == nil {
                 order.append(day)
@@ -343,7 +388,7 @@ struct EventListView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        EventTitleLabel(event: event)
+                        EventTitleLabel(event: event, strikethrough: mode == .past)
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if event.mapLink == nil && event.callLink == nil {
@@ -379,9 +424,9 @@ struct EventListView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .modifier(EventRowHoverHighlight(baseTint: rowTint(for: mode, event: event)))
-            .onTapGesture(count: appModel.openCalendarOnSingleClick ? 1 : 2) {
+            .modifier(OpenCalendarOnClick(mode: appModel.openCalendarClickMode) {
                 appModel.calendarService.openCalendar(to: event.startDate)
-            }
+            })
 
                 if showDivider {
                     Divider()
@@ -403,9 +448,14 @@ struct EventListView: View {
         )
     }
 
-    // Only the in-progress (ongoing) event is tinted, with a faint red highlight.
+    // Ongoing ("Now") rows get a faint red tint; the imminent "Next" event(s) get a
+    // deeper red so the very next thing on the schedule stands out most.
     private func rowTint(for mode: EventRowMode, event: CalendarEvent) -> Color {
-        mode == .now ? Color.red.opacity(0.12) : .clear
+        switch mode {
+        case .now: return Color.red.opacity(0.12)
+        case .next: return Color.red.opacity(0.22)
+        default: return .clear
+        }
     }
 
     // Single most-significant unit, e.g. "1 hour" or "45 minutes".
@@ -416,15 +466,15 @@ struct EventListView: View {
     }
 
     // Trailing status text for an event row: time until it starts (upcoming),
-    // time until it ends (now / in progress), or how long ago it started (past).
+    // time until it ends (now / in progress), or how long ago it ended (past).
     private func trailingCountdown(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
         switch mode {
-        case .upcoming:
+        case .upcoming, .next:
             return fullCountdown(for: event.startDate, now: now)
         case .now:
             return "ends in \(singleUnitCountdown(for: event.endDate, now: now))"
         case .past:
-            return agoText(for: event.startDate, now: now)
+            return agoText(for: event.endDate, now: now)
         }
     }
 
@@ -597,10 +647,30 @@ private struct EventLeadingGlyph: View {
 
 private struct EventTitleLabel: View {
     let event: CalendarEvent
+    var strikethrough: Bool = false
 
     var body: some View {
         Text(EventTitleEmoji.titleWithoutLeadingEmoji(event.title))
             .font(.body)
+            .strikethrough(strikethrough)
+    }
+}
+
+// Opens Calendar on a tap when enabled — single or double click per the user's setting,
+// or not at all when set to Never (no gesture is attached).
+private struct OpenCalendarOnClick: ViewModifier {
+    let mode: OpenCalendarClickMode
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        switch mode {
+        case .never:
+            content
+        case .single:
+            content.onTapGesture(count: 1, perform: action)
+        case .double:
+            content.onTapGesture(count: 2, perform: action)
+        }
     }
 }
 

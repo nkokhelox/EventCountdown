@@ -14,6 +14,7 @@ enum AppConstants {
     static let fetchHorizonYears = 3
     static let firstRunKey = "hasSeenFirstRunHint"
     static let openCalendarOnSingleClickKey = "openCalendarOnSingleClick"
+    static let openCalendarClickModeKey = "openCalendarClickMode"
     static let pastEventWindowHoursKey = "pastEventWindowHours"
     static let launchAtLoginKey = "launchAtLoginEnabled"
     static let enabledCalendarIDsKey = "enabledCalendarIDs"

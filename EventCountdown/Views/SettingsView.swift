@@ -81,14 +81,15 @@ struct SettingsView: View {
                 aboutSettingsGroup(title: "Events", systemImage: "hand.tap") {
                     eventsSubgroup(
                         "Open Calendar on",
-                        description: "Choose whether clicking or double-clicking an event opens Calendar to that day."
+                        description: "Choose whether a single click, a double-click, or neither opens Calendar to that day."
                     ) {
                         Picker("", selection: Binding(
-                            get: { appModel.openCalendarOnSingleClick },
-                            set: { appModel.openCalendarOnSingleClick = $0 }
+                            get: { appModel.openCalendarClickMode },
+                            set: { appModel.openCalendarClickMode = $0 }
                         )) {
-                            Text("Double click").tag(false)
-                            Text("Single click").tag(true)
+                            Text("Never").tag(OpenCalendarClickMode.never)
+                            Text("Single click").tag(OpenCalendarClickMode.single)
+                            Text("Double click").tag(OpenCalendarClickMode.double)
                         }
                         .pickerStyle(.radioGroup)
                         .labelsHidden()
@@ -96,12 +97,13 @@ struct SettingsView: View {
 
                     eventsSubgroup(
                         "Show past event for",
-                        description: "How long a just-passed event stays in the panel's Past section."
+                        description: "How long a just-passed event stays in the panel's Past section; choose Never to hide it."
                     ) {
                         Picker("", selection: Binding(
                             get: { appModel.pastEventWindowHours },
                             set: { appModel.pastEventWindowHours = $0 }
                         )) {
+                            Text("Never").tag(0)
                             Text("1 hour").tag(1)
                             Text("2 hours").tag(2)
                             Text("4 hours").tag(4)
@@ -122,38 +124,36 @@ struct SettingsView: View {
     }
 
     private var aboutInfoCard: some View {
-        HStack(alignment: .top, spacing: 14) {
-            if let icon = AppIconRenderer.image(pointSize: 56) {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 56, height: 56)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if let icon = AppIconRenderer.image(pointSize: 22) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .frame(width: 22, height: 22)
+                }
+                Text("EventCountdown")
+                    .font(.title2.weight(.semibold))
+                Spacer(minLength: 8)
+                if let version = appVersionText {
+                    Text(version)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("EventCountdown")
-                        .font(.title2.weight(.semibold))
-                    Spacer(minLength: 8)
-                    if let version = appVersionText {
-                        Text(version)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
 
-                Text("The units of measure we use are fixed for simplicity")
-                    .font(.subheadline.weight(.semibold))
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(countdownUnitFacts, id: \.self) { fact in
-                        Text(fact)
-                    }
+            Text("The units of measure we use are fixed for simplicity")
+                .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(countdownUnitFacts, id: \.self) { fact in
+                    Text(fact)
                 }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            Text("This keeps boundaries consistent but differs from calendar months.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                Text("This keeps boundaries consistent but differs from calendar months.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

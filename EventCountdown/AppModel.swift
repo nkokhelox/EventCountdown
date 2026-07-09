@@ -1,6 +1,14 @@
 import Foundation
 import Observation
 
+// How a click on an event row opens Calendar: not at all, on a single click, or on a
+// double click.
+enum OpenCalendarClickMode: Int, CaseIterable {
+    case never = 0
+    case single = 1
+    case double = 2
+}
+
 @Observable
 final class AppModel {
     let calendarService: CalendarService
@@ -11,8 +19,8 @@ final class AppModel {
         didSet { UserDefaults.standard.set(hasSeenFirstRunHint, forKey: AppConstants.firstRunKey) }
     }
 
-    var openCalendarOnSingleClick: Bool {
-        didSet { UserDefaults.standard.set(openCalendarOnSingleClick, forKey: AppConstants.openCalendarOnSingleClickKey) }
+    var openCalendarClickMode: OpenCalendarClickMode {
+        didSet { UserDefaults.standard.set(openCalendarClickMode.rawValue, forKey: AppConstants.openCalendarClickModeKey) }
     }
 
     // How long a just-passed event stays in the panel's "Past" section, in hours.
@@ -24,9 +32,20 @@ final class AppModel {
         emojiStore = EmojiMappingStore()
         launchAtLoginService = LaunchAtLoginService()
         hasSeenFirstRunHint = UserDefaults.standard.bool(forKey: AppConstants.firstRunKey)
-        openCalendarOnSingleClick = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey)
-        let storedPastWindowHours = UserDefaults.standard.integer(forKey: AppConstants.pastEventWindowHoursKey)
-        pastEventWindowHours = storedPastWindowHours == 0 ? AppConstants.defaultPastEventWindowHours : storedPastWindowHours
+        if let storedClickMode = UserDefaults.standard.object(forKey: AppConstants.openCalendarClickModeKey) as? Int,
+           let mode = OpenCalendarClickMode(rawValue: storedClickMode) {
+            openCalendarClickMode = mode
+        } else {
+            // Migrate the old single-click boolean; absence defaults to double click.
+            openCalendarClickMode = UserDefaults.standard.bool(forKey: AppConstants.openCalendarOnSingleClickKey) ? .single : .double
+        }
+        // Presence check, not `== 0`: 0 is a valid stored value meaning "Off" (hide the
+        // Past section). Only fall back to the default when nothing has been stored yet.
+        if UserDefaults.standard.object(forKey: AppConstants.pastEventWindowHoursKey) == nil {
+            pastEventWindowHours = AppConstants.defaultPastEventWindowHours
+        } else {
+            pastEventWindowHours = UserDefaults.standard.integer(forKey: AppConstants.pastEventWindowHoursKey)
+        }
 
         calendarService = CalendarService()
     }
