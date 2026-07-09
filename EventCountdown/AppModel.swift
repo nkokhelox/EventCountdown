@@ -28,6 +28,12 @@ final class AppModel {
         didSet { UserDefaults.standard.set(pastEventWindowHours, forKey: AppConstants.pastEventWindowHoursKey) }
     }
 
+    // How soon before it starts an event moves into the panel's "Next" section, in hours.
+    // 0 means never show a Next section (events stay in Upcoming until they begin).
+    var nextEventWindowHours: Int {
+        didSet { UserDefaults.standard.set(nextEventWindowHours, forKey: AppConstants.nextEventWindowHoursKey) }
+    }
+
     init() {
         emojiStore = EmojiMappingStore()
         launchAtLoginService = LaunchAtLoginService()
@@ -45,6 +51,12 @@ final class AppModel {
             pastEventWindowHours = AppConstants.defaultPastEventWindowHours
         } else {
             pastEventWindowHours = UserDefaults.standard.integer(forKey: AppConstants.pastEventWindowHoursKey)
+        }
+        // Presence check, not `== 0`: 0 is a valid stored value meaning "Never".
+        if UserDefaults.standard.object(forKey: AppConstants.nextEventWindowHoursKey) == nil {
+            nextEventWindowHours = AppConstants.defaultNextEventWindowHours
+        } else {
+            nextEventWindowHours = UserDefaults.standard.integer(forKey: AppConstants.nextEventWindowHoursKey)
         }
 
         calendarService = CalendarService()

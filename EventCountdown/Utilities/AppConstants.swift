@@ -7,6 +7,7 @@ enum AppConstants {
     // How long the menu bar shows "now" before switching to "Late".
     static let ackNowDisplaySeconds: TimeInterval = 60
     static let defaultPastEventWindowHours = 2
+    static let defaultNextEventWindowHours = 2
     static let displayEventCount = 5
     static let panelHorizonDays = 7
     static let pastFetchHorizonDays = 30
@@ -16,6 +17,7 @@ enum AppConstants {
     static let openCalendarOnSingleClickKey = "openCalendarOnSingleClick"
     static let openCalendarClickModeKey = "openCalendarClickMode"
     static let pastEventWindowHoursKey = "pastEventWindowHours"
+    static let nextEventWindowHoursKey = "nextEventWindowHours"
     static let launchAtLoginKey = "launchAtLoginEnabled"
     static let enabledCalendarIDsKey = "enabledCalendarIDs"
     static let emojiRulesKey = "emojiRules"

@@ -266,11 +266,18 @@ struct EventListView: View {
         return years.count > 1
     }
 
-    // The soonest upcoming event and any others starting at the exact same time.
-    // panelEvents is sorted by start ascending, so these are its leading equal-start run.
+    // The soonest upcoming event and any others starting at the exact same time — but
+    // only once that start is within the chosen window (Never / ≤N hours). Until then it
+    // stays in Upcoming. panelEvents is sorted by start ascending, so the equal-start run
+    // is a leading prefix.
     private var nextEvents: [CalendarEvent] {
+        let windowHours = appModel.nextEventWindowHours
+        guard windowHours > 0 else { return [] } // Never: no Next section
         let events = appModel.calendarService.panelEvents
-        guard let firstStart = events.first?.startDate else { return [] }
+        guard let first = events.first else { return [] }
+        let window = TimeInterval(windowHours) * 60 * 60
+        guard first.startDate.timeIntervalSince(appModel.tick) <= window else { return [] }
+        let firstStart = first.startDate
         return Array(events.prefix { $0.startDate == firstStart })
     }
 

@@ -112,6 +112,24 @@ struct SettingsView: View {
                         .pickerStyle(.radioGroup)
                         .labelsHidden()
                     }
+
+                    eventsSubgroup(
+                        "Move to Next section",
+                        description: "The soonest event moves out of Upcoming into its own Next section once its start is within this window. Never keeps everything in Upcoming (no Next section)."
+                    ) {
+                        Picker("", selection: Binding(
+                            get: { appModel.nextEventWindowHours },
+                            set: { appModel.nextEventWindowHours = $0 }
+                        )) {
+                            Text("Never").tag(0)
+                            Text("1 hour").tag(1)
+                            Text("2 hours").tag(2)
+                            Text("4 hours").tag(4)
+                            Text("8 hours").tag(8)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
+                    }
                 }
 
                 aboutInfoCard
@@ -126,11 +144,6 @@ struct SettingsView: View {
     private var aboutInfoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                if let icon = AppIconRenderer.image(pointSize: 22) {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .frame(width: 22, height: 22)
-                }
                 Text("EventCountdown")
                     .font(.title2.weight(.semibold))
                 Spacer(minLength: 8)
