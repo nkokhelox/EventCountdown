@@ -425,11 +425,13 @@ struct EventListView: View {
                         if let mapLink = event.mapLink {
                             iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: mode == .past, color: event.calendarColor) {
                                 NSWorkspace.shared.open(mapLink)
+                                dismiss()
                             }
                         }
                         if let callLink = event.callLink {
                             iconLinkButton(system: "video", label: "Join Call", greyed: mode == .past, color: event.calendarColor) {
                                 NSWorkspace.shared.open(callLink)
+                                dismiss()
                             }
                         }
                     }
