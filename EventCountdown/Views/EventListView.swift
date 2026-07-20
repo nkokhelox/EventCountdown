@@ -786,15 +786,18 @@ private struct MonthCalendarView: View {
                 Button { changeMonth(by: -1) } label: {
                     Image(systemName: "chevron.left").fontWeight(.bold)
                 }
+                .help("Previous month")
                 .accessibilityLabel("Previous month")
                 Button(action: goToToday) {
-                    Circle().fill(Color.secondary).frame(width: 14, height: 14)
+                    Image(systemName: todaySymbolName)
+                        .font(.system(size: 13, weight: .semibold))
                 }
                 .help("Today")
                 .accessibilityLabel("Today")
                 Button { changeMonth(by: 1) } label: {
                     Image(systemName: "chevron.right").fontWeight(.bold)
                 }
+                .help("Next month")
                 .accessibilityLabel("Next month")
             }
             .buttonStyle(.borderless)
@@ -909,6 +912,11 @@ private struct MonthCalendarView: View {
         let today = calendar.startOfDay(for: Date())
         selection = today
         visibleMonth = startOfMonth(today)
+    }
+
+    // SF Symbol for today's date in a circle, e.g. "20.circle" (1...31 all exist).
+    private var todaySymbolName: String {
+        "\(calendar.component(.day, from: Date())).circle"
     }
 }
 
