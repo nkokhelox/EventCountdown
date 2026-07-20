@@ -30,11 +30,11 @@ enum CountdownSchedule {
     // minute, whole minutes in the minutes range (no fractional countdown), otherwise 0.1
     // of the current unit. Shared by nextChange and updateCadence so they never drift.
     private static func menuBarStep(remaining: TimeInterval) -> TimeInterval {
-        if remaining < 60 { return 1 }
         let unitSeconds = CountdownFormatter.menuBarUnitSeconds(for: remaining)
+        if unitSeconds <= 1 { return 1 } // seconds → every second
         let raw = remaining / unitSeconds
         // Whole-unit cadence while showing whole numbers (>= 2 of the unit); the finer
-        // 0.1-unit cadence only in the final "1.x" window that shows a decimal.
+        // 0.1-unit cadence only in the final "1.1-1.9" window that shows a decimal.
         return raw >= 2 ? unitSeconds : unitSeconds / 10
     }
 
