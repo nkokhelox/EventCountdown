@@ -17,8 +17,16 @@ struct EventListView: View {
     @State private var measuredScrollContentHeight: CGFloat = 0
     @State private var collapsedDayIDs: Set<Date> = []
     @State private var isAddingEvent = false
+    // The day chosen in the calendar. Reset to today every time the panel appears.
+    @State private var pickerDate = Date()
 
     private static let defaultExpandedDayCount = 2
+    private static let contentHorizontalPadding: CGFloat = 12
+
+    // The selected day, normalized to midnight. `isTodaySelected` drives whether the panel
+    // shows the live upcoming list (today) or just that day's events (any other day).
+    private var selectedDay: Date { Calendar.current.startOfDay(for: pickerDate) }
+    private var isTodaySelected: Bool { Calendar.current.isDateInToday(pickerDate) }
 
     private enum EventRowMode {
         case upcoming
@@ -48,7 +56,8 @@ struct EventListView: View {
     }
 
     private var allDaysCollapsed: Bool {
-        !groupedPanelEvents.isEmpty && groupedPanelEvents.allSatisfy { collapsedDayIDs.contains($0.day) }
+        let groups = groupedPanelEvents(now: Date())
+        return !groups.isEmpty && groups.allSatisfy { collapsedDayIDs.contains($0.day) }
     }
 
     private var nonScrollChromeHeight: CGFloat {
@@ -89,7 +98,10 @@ struct EventListView: View {
 
             footer
         }
-        .onAppear(perform: applyDefaultDayCollapse)
+        .onAppear {
+            pickerDate = Date() // today is always selected by default when the panel opens
+            applyDefaultDayCollapse()
+        }
         .onChange(of: eventDays) { _, _ in
             applyDefaultDayCollapse()
         }
@@ -113,13 +125,54 @@ struct EventListView: View {
 
     @ViewBuilder
     private var eventsBody: some View {
-        // Re-evaluate every tick so events move between Upcoming/Now/Past the instant
-        // their start/end time passes (section lists are computed live off the clock).
-        let _ = appModel.tick
-        let past = visiblePastEvent
+        VStack(alignment: .leading, spacing: 8) {
+            calendarPicker
+            // A per-second timeline drives section re-bucketing (an event moves between
+            // Upcoming/Now/Past the instant its start/end passes) only while the panel is
+            // on screen. It is independent of the menu bar's adaptive clock (AppModel.tick),
+            // which no longer fires every second. The calendar is kept outside the timeline
+            // so it isn't rebuilt each second.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                sectionsBody(now: context.date)
+            }
+        }
+        .padding(.horizontal, Self.contentHorizontalPadding)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(scrollHeightReader)
+    }
+
+    private var calendarPicker: some View {
+        // A custom month grid (rather than DatePicker's .graphical style, which stays
+        // intrinsic-sized and centered on macOS) so the calendar fills the full list width.
+        MonthCalendarView(selection: $pickerDate, eventDays: eventDayStarts)
+            .frame(maxWidth: .infinity)
+    }
+
+    // Day-starts (midnight) that have at least one event, for the calendar's event dots.
+    // Covers every day a (possibly multi-day) event spans.
+    private var eventDayStarts: Set<Date> {
+        let calendar = Calendar.current
+        var days: Set<Date> = []
+        for event in appModel.calendarService.fetchedEvents {
+            var day = calendar.startOfDay(for: event.startDate)
+            let last = calendar.startOfDay(for: event.endDate)
+            var guardCount = 0
+            while day <= last && guardCount < 400 {
+                days.insert(day)
+                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+                day = next
+                guardCount += 1
+            }
+        }
+        return days
+    }
+
+    @ViewBuilder
+    private func sectionsBody(now: Date) -> some View {
+        let past = visiblePastEvent(now: now)
         let nowEvents = appModel.calendarService.nowEvents
-        let next = nextEvents
-        let remaining = remainingPanelEvents
+        let next = nextEvents(now: now)
         VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
             if let past {
                 pastSection(past)
@@ -130,20 +183,65 @@ struct EventListView: View {
             if !next.isEmpty {
                 nextSection(next, showsSettings: past == nil && nowEvents.isEmpty)
             }
+            // The selected day's events live below the time-relative sections. Today shows
+            // the full live upcoming list (as before); any other day shows just that day.
+            selectedDaySection(now: now, hasPast: past != nil, nowEvents: nowEvents, next: next)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func selectedDaySection(now: Date, hasPast: Bool, nowEvents: [CalendarEvent], next: [CalendarEvent]) -> some View {
+        // The settings gear lives in the first visible section header; it lands here only
+        // when there is no Past / Now / Next section above.
+        let showsSettings = !hasPast && nowEvents.isEmpty && next.isEmpty
+        if isTodaySelected {
+            let remaining = remainingPanelEvents(now: now)
             if !remaining.isEmpty {
-                upcomingHeader(showsSettings: past == nil && nowEvents.isEmpty && next.isEmpty)
-                upcomingEventsList
+                upcomingHeader(showsSettings: showsSettings)
+                upcomingEventsList(now: now)
             } else if next.isEmpty {
-                upcomingHeader(showsSettings: past == nil && nowEvents.isEmpty)
+                upcomingHeader(showsSettings: showsSettings)
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
             }
+        } else {
+            selectedDayList(showsSettings: showsSettings)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, allDaysCollapsed ? 6 : 8)
-        .padding(.bottom, allDaysCollapsed ? 4 : 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(scrollHeightReader)
+    }
+
+    @ViewBuilder
+    private func selectedDayList(showsSettings: Bool) -> some View {
+        let events = eventsOnSelectedDay
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(dayDividerLabel(selectedDay))
+                    .font(.headline)
+                Spacer()
+                if showsSettings {
+                    settingsButton
+                }
+            }
+            if events.isEmpty {
+                Text("No events on this day.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                    eventRow(event, showDivider: index < events.count - 1, mode: .upcoming)
+                }
+            }
+        }
+    }
+
+    // Events overlapping the selected day, sorted by start. Drawn from the full fetched set
+    // so past days within the fetch horizon show their events too.
+    private var eventsOnSelectedDay: [CalendarEvent] {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: selectedDay)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+        return appModel.calendarService.fetchedEvents
+            .filter { $0.startDate < dayEnd && $0.endDate > dayStart }
+            .sorted { $0.startDate < $1.startDate }
     }
 
     private var firstRunHint: some View {
@@ -160,11 +258,11 @@ struct EventListView: View {
     }
 
     // The recent past event while it is still within its display window, measured from
-    // when it finished. Tracked live off appModel.tick so it ages out on time.
-    private var visiblePastEvent: CalendarEvent? {
+    // when it finished. Evaluated against the panel timeline's `now` so it ages out on time.
+    private func visiblePastEvent(now: Date) -> CalendarEvent? {
         guard appModel.pastEventWindowHours > 0 else { return nil } // Off: never show a past event
         guard let past = appModel.calendarService.recentPastEvent else { return nil }
-        let elapsed = appModel.tick.timeIntervalSince(past.endDate)
+        let elapsed = now.timeIntervalSince(past.endDate)
         let window = TimeInterval(appModel.pastEventWindowHours) * 60 * 60
         return (elapsed >= 0 && elapsed <= window) ? past : nil
     }
@@ -250,9 +348,9 @@ struct EventListView: View {
         }
     }
 
-    private var upcomingEventsList: some View {
+    private func upcomingEventsList(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(groupedPanelEvents) { group in
+            ForEach(groupedPanelEvents(now: now)) { group in
                 daySection(group)
             }
         }
@@ -291,28 +389,28 @@ struct EventListView: View {
     // only once that start is within the chosen window (Never / ≤N hours). Until then it
     // stays in Upcoming. panelEvents is sorted by start ascending, so the equal-start run
     // is a leading prefix.
-    private var nextEvents: [CalendarEvent] {
+    private func nextEvents(now: Date) -> [CalendarEvent] {
         let windowHours = appModel.nextEventWindowHours
         guard windowHours > 0 else { return [] } // Never: no Next section
         let events = panelSourceEvents
         guard let first = events.first else { return [] }
         let window = TimeInterval(windowHours) * 60 * 60
-        guard first.startDate.timeIntervalSince(appModel.tick) <= window else { return [] }
+        guard first.startDate.timeIntervalSince(now) <= window else { return [] }
         let firstStart = first.startDate
         return Array(events.prefix { $0.startDate == firstStart })
     }
 
     // Upcoming panel events excluding the Next run — these are grouped by day below.
-    private var remainingPanelEvents: [CalendarEvent] {
-        Array(panelSourceEvents.dropFirst(nextEvents.count))
+    private func remainingPanelEvents(now: Date) -> [CalendarEvent] {
+        Array(panelSourceEvents.dropFirst(nextEvents(now: now).count))
     }
 
-    private var groupedPanelEvents: [DayEventGroup] {
+    private func groupedPanelEvents(now: Date) -> [DayEventGroup] {
         let calendar = Calendar.current
         var groups: [Date: [CalendarEvent]] = [:]
         var order: [Date] = []
 
-        for event in remainingPanelEvents {
+        for event in remainingPanelEvents(now: now) {
             let day = calendar.startOfDay(for: event.startDate)
             if groups[day] == nil {
                 order.append(day)
@@ -325,7 +423,7 @@ struct EventListView: View {
     }
 
     private var eventDays: [Date] {
-        groupedPanelEvents.map(\.day)
+        groupedPanelEvents(now: Date()).map(\.day)
     }
 
     private func applyDefaultDayCollapse() {
@@ -417,10 +515,7 @@ struct EventListView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if event.mapLink == nil && event.callLink == nil {
-                            Circle()
-                                .fill(event.calendarColor)
-                                .frame(width: 7, height: 7)
-                                .accessibilityHidden(true)
+                            calendarIndicator(event)
                         }
                         if let mapLink = event.mapLink {
                             iconLinkButton(system: "mappin.and.ellipse", label: "Open Location", greyed: mode == .past, color: event.calendarColor) {
@@ -429,7 +524,9 @@ struct EventListView: View {
                             }
                         }
                         if let callLink = event.callLink {
-                            iconLinkButton(system: "video", label: "Join Call", greyed: mode == .past, color: event.calendarColor) {
+                            // Phone icon for a dial-in (tel:/audio); video icon for a web/app meeting link.
+                            let isPhone = ["tel", "facetime-audio"].contains(callLink.scheme?.lowercased() ?? "")
+                            iconLinkButton(system: isPhone ? "phone" : "video", label: isPhone ? "Call" : "Join Call", greyed: mode == .past, color: event.calendarColor) {
                                 NSWorkspace.shared.open(callLink)
                                 dismiss()
                             }
@@ -481,7 +578,7 @@ struct EventListView: View {
         switch mode {
         case .now: return Color.red.opacity(0.12)
         // Deeper red only when there is a start-time conflict (more than one Next event).
-        case .next: return nextEvents.count > 1 ? Color.red.opacity(0.22) : .clear
+        case .next: return nextEvents(now: Date()).count > 1 ? Color.red.opacity(0.22) : .clear
         default: return .clear
         }
     }
@@ -503,6 +600,31 @@ struct EventListView: View {
             return "ends in \(singleUnitCountdown(for: event.endDate, now: now))"
         case .past:
             return agoText(for: event.endDate, now: now)
+        }
+    }
+
+    // Calendar provenance shown on a row: a single color dot for a normal event; one dot
+    // per calendar (in each calendar's color) for an event merged from 2–3 calendars; and a
+    // git-merge icon once it spans more than 3 calendars.
+    @ViewBuilder
+    private func calendarIndicator(_ event: CalendarEvent) -> some View {
+        if event.calendarCount > 3 {
+            Image(systemName: "arrow.triangle.merge")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .help("On \(event.calendarCount) calendars")
+                .accessibilityHidden(true)
+        } else {
+            HStack(spacing: -2) {
+                ForEach(Array(event.calendarColors.enumerated()), id: \.offset) { _, color in
+                    Circle()
+                        .fill(color)
+                        .frame(width: 7, height: 7)
+                        .overlay(Circle().stroke(Color(nsColor: .windowBackgroundColor), lineWidth: 0.5))
+                }
+            }
+            .help(event.calendarCount > 1 ? "On \(event.calendarCount) calendars" : "")
+            .accessibilityHidden(true)
         }
     }
 
@@ -624,6 +746,169 @@ private struct DayEventGroup: Identifiable {
 
     var earliestEvent: CalendarEvent? {
         events.min(by: { $0.startDate < $1.startDate })
+    }
+}
+
+// A full-width month calendar: a header with month/year + prev/next, a weekday row, and a
+// 6-week grid of equal flexible columns so it stretches to fill the panel. Selecting a day
+// updates `selection`; today is outlined, the selected day is filled.
+private struct MonthCalendarView: View {
+    @Binding var selection: Date
+    var eventDays: Set<Date>
+
+    @State private var visibleMonth = Date()
+
+    private let calendar = Calendar.current
+    private static let daysPerWeek = 7
+    private static let weeksShown = 6
+
+    var body: some View {
+        VStack(spacing: 6) {
+            header
+            weekdayHeader
+            daysGrid
+        }
+        .onAppear { visibleMonth = startOfMonth(selection) }
+        .onChange(of: selection) { _, newValue in
+            // Follow the selection into its month (e.g. when it resets to today on reopen).
+            if !calendar.isDate(newValue, equalTo: visibleMonth, toGranularity: .month) {
+                visibleMonth = startOfMonth(newValue)
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Text(monthTitle)
+                .font(.headline)
+            Spacer()
+            HStack(spacing: 12) {
+                Button { changeMonth(by: -1) } label: {
+                    Image(systemName: "chevron.left").fontWeight(.bold)
+                }
+                .accessibilityLabel("Previous month")
+                Button(action: goToToday) {
+                    Circle().fill(Color.secondary).frame(width: 14, height: 14)
+                }
+                .help("Today")
+                .accessibilityLabel("Today")
+                Button { changeMonth(by: 1) } label: {
+                    Image(systemName: "chevron.right").fontWeight(.bold)
+                }
+                .accessibilityLabel("Next month")
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+
+    private var weekdayHeader: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                Text(symbol)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var daysGrid: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: Self.daysPerWeek)
+        return LazyVGrid(columns: columns, spacing: 2) {
+            ForEach(gridDays, id: \.self) { day in
+                dayCell(day)
+            }
+        }
+    }
+
+    private func dayCell(_ day: Date) -> some View {
+        let isSelected = calendar.isDate(day, inSameDayAs: selection)
+        let isToday = calendar.isDateInToday(day)
+        let inMonth = calendar.isDate(day, equalTo: visibleMonth, toGranularity: .month)
+        let hasEvent = eventDays.contains(calendar.startOfDay(for: day))
+        return Button {
+            selection = day
+        } label: {
+            ZStack {
+                Group {
+                    if isSelected {
+                        Circle().fill(Color.accentColor)
+                    } else if isToday {
+                        Circle().strokeBorder(Color.accentColor, lineWidth: 1)
+                    }
+                }
+                .frame(width: 30, height: 30)
+
+                Text("\(calendar.component(.day, from: day))")
+                    .font(.system(size: 14))
+                    .foregroundStyle(dayColor(inMonth: inMonth, isSelected: isSelected))
+            }
+            .frame(maxWidth: .infinity, minHeight: 34)
+            .overlay(alignment: .bottom) {
+                Circle()
+                    .fill(dotColor(inMonth: inMonth, isSelected: isSelected))
+                    .frame(width: 4, height: 4)
+                    // Hidden on the selected day so it doesn't clash with the fill circle.
+                    .opacity(hasEvent && !isSelected ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dayColor(inMonth: Bool, isSelected: Bool) -> Color {
+        if isSelected { return .white }
+        return inMonth ? .primary : Color.secondary.opacity(0.4)
+    }
+
+    private func dotColor(inMonth: Bool, isSelected: Bool) -> Color {
+        if isSelected { return .white }
+        return inMonth ? .accentColor : Color.secondary.opacity(0.4)
+    }
+
+    // MARK: Date math
+
+    private var monthTitle: String {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("yMMMM")
+        return formatter.string(from: visibleMonth)
+    }
+
+    // Locale-aware weekday initials, rotated so the first column is the locale's first day.
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortWeekdaySymbols
+        let shift = calendar.firstWeekday - 1
+        return Array(symbols[shift...] + symbols[..<shift])
+    }
+
+    // Six weeks of dates starting on the first-weekday on/before the 1st of the month, so
+    // the grid is a stable height and shows leading/trailing days of adjacent months.
+    private var gridDays: [Date] {
+        let firstOfMonth = startOfMonth(visibleMonth)
+        let weekday = calendar.component(.weekday, from: firstOfMonth)
+        let leading = (weekday - calendar.firstWeekday + Self.daysPerWeek) % Self.daysPerWeek
+        guard let gridStart = calendar.date(byAdding: .day, value: -leading, to: firstOfMonth) else {
+            return []
+        }
+        return (0..<(Self.daysPerWeek * Self.weeksShown)).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: gridStart)
+        }
+    }
+
+    private func startOfMonth(_ date: Date) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+    }
+
+    private func changeMonth(by delta: Int) {
+        if let newMonth = calendar.date(byAdding: .month, value: delta, to: visibleMonth) {
+            visibleMonth = newMonth
+        }
+    }
+
+    private func goToToday() {
+        let today = calendar.startOfDay(for: Date())
+        selection = today
+        visibleMonth = startOfMonth(today)
     }
 }
 

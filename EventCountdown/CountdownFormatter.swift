@@ -123,10 +123,16 @@ enum CountdownFormatter {
             // interval is in (59, 60): show "1 Min" rather than "60 Sec".
             return "1 \(CountdownUnit.minutes.compactLabel(for: 1))".capitalized
         }
-        // A minute or more: the largest fitting unit with one decimal, truncated so
-        // the value never overstates the true remaining time (no phantom extra minute).
+        // A minute or more: the largest fitting unit. Whole numbers for two or more of the
+        // unit; one decimal only for the final unit (the "1.x" range) just before it drops
+        // to the next-smaller unit. Truncated so the value never overstates the true time.
         let (unit, unitSeconds) = menuBarUnit(for: interval)
-        let value = max(0.1, (interval / unitSeconds * 10).rounded(.down) / 10)
+        let raw = interval / unitSeconds
+        if raw >= 2 {
+            let whole = Int(raw.rounded(.down))
+            return "\(whole) \(unit.compactLabel(for: whole))".capitalized
+        }
+        let value = max(0.1, (raw * 10).rounded(.down) / 10)
         let number = value == value.rounded()
             ? String(Int(value))
             : String(format: "%.1f", value)
@@ -134,13 +140,22 @@ enum CountdownFormatter {
     }
 
     private static func menuBarUnit(for interval: TimeInterval) -> (CountdownUnit, TimeInterval) {
-        if interval > twoYears { return (.years, year) }
-        if interval > threeMonths { return (.months, month) }
-        if interval > twoWeeks { return (.weeks, week) }
-        if interval > twoDays { return (.days, day) }
-        if interval >= oneHour { return (.hours, hour) }
-        if interval >= oneMinute { return (.minutes, minute) }
+        // Each unit switches to the next-smaller one at 1 of the unit, so every unit spends
+        // its final stretch (1–2 of the unit) showing a decimal before it drops down.
+        if interval >= year { return (.years, year) }
+        if interval >= month { return (.months, month) }
+        if interval >= week { return (.weeks, week) }
+        if interval >= day { return (.days, day) }
+        if interval >= hour { return (.hours, hour) }
+        if interval >= minute { return (.minutes, minute) }
         return (.seconds, 1)
+    }
+
+    // Seconds-per-unit of the unit the menu-bar decimal label uses at `interval`.
+    // Exposed so CountdownSchedule can size its update cadence to 0.1 of this unit
+    // using the exact same thresholds as -menuBarDecimalText, so the two never drift.
+    static func menuBarUnitSeconds(for interval: TimeInterval) -> TimeInterval {
+        menuBarUnit(for: interval).1
     }
 
     static func remaining(until date: Date, now: Date = Date()) -> TimeInterval {

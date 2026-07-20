@@ -132,6 +132,10 @@ struct SettingsView: View {
                     }
                 }
 
+                aboutSettingsGroup(title: "Menu bar refresh", systemImage: "timer") {
+                    menuBarRefreshInfo
+                }
+
                 aboutInfoCard
             }
             .padding(20)
@@ -178,6 +182,76 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         }
+    }
+
+    private var menuBarRefreshInfo: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Refresh cadence")
+                Spacer()
+                Text(refreshCadenceText)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Next refresh time")
+                Spacer()
+                Text(nextRefreshText)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Driven by Event")
+                Spacer()
+                Text(appModel.menuBarRefreshSourceTitle ?? "—")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .font(.callout)
+    }
+
+    // How often the menu bar currently refreshes (widens as the event gets further away).
+    private var refreshCadenceText: String {
+        guard let interval = appModel.menuBarRefreshInterval else {
+            return appModel.menuBarRefreshSourceTitle == nil ? "Idle" : "While ongoing"
+        }
+        return cadenceText(interval)
+    }
+
+    private func cadenceText(_ interval: TimeInterval) -> String {
+        let value: Double
+        let unit: String
+        switch interval {
+        case ..<60: value = interval; unit = "sec"
+        case ..<3600: value = interval / 60; unit = "min"
+        case ..<86400: value = interval / 3600; unit = "hr"
+        default: value = interval / 86400; unit = "day"
+        }
+        let number = value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+        return "Every \(number) \(unit)\(value == 1 ? "" : "s")"
+    }
+
+    // When the menu bar will next update. The label only changes when its text can, so for
+    // a far-off event this is minutes/hours away; when it's counting down by the second we
+    // just say "Seconds" rather than a fast-moving timestamp.
+    private var nextRefreshText: String {
+        if let interval = appModel.menuBarRefreshInterval, interval < 60 {
+            return "Seconds"
+        }
+        guard let next = appModel.menuBarNextRefresh else {
+            return "Idle — no upcoming event"
+        }
+        return formattedNextRefresh(next)
+    }
+
+    private func formattedNextRefresh(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        if Calendar.current.isDateInToday(date) {
+            formatter.setLocalizedDateFormatFromTemplate("jmmss")
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
+        }
+        return formatter.string(from: date)
     }
 
     private var appVersionText: String? {

@@ -32,6 +32,14 @@
 		A10000000000000000000025 /* EventTitleEmoji.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* EventTitleEmoji.swift */; };
 		A10000000000000000000026 /* EventCallLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* EventCallLink.swift */; };
 		A10000000000000000000029 /* EventEmojiResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* EventEmojiResolution.swift */; };
+		A10000000000000000000030 /* CountdownSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* CountdownSchedule.swift */; };
+		A10000000000000000000031 /* CountdownSchedule.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* CountdownSchedule.swift */; };
+		A10000000000000000000032 /* CountdownScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* CountdownScheduleTests.swift */; };
+		A10000000000000000000033 /* EventMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* EventMerger.swift */; };
+		A10000000000000000000034 /* EventMerger.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* EventMerger.swift */; };
+		A10000000000000000000035 /* EventMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* EventMergerTests.swift */; };
+		A10000000000000000000036 /* CalendarEvent.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* CalendarEvent.swift */; };
+		A10000000000000000000037 /* EventKey.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* EventKey.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +78,10 @@
 		A20000000000000000000025 /* EventTitleEmoji.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTitleEmoji.swift; sourceTree = "<group>"; };
 		A20000000000000000000026 /* EventCallLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventCallLink.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* EventEmojiResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEmojiResolution.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* CountdownSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownSchedule.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* CountdownScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownScheduleTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* EventMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMerger.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* EventMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMergerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -121,6 +133,8 @@
 			children = (
 				A20000000000000000000018 /* CountdownFormatterTests.swift */,
 				A20000000000000000000027 /* EventCallLinkTests.swift */,
+				A20000000000000000000031 /* CountdownScheduleTests.swift */,
+				A20000000000000000000033 /* EventMergerTests.swift */,
 			);
 			path = EventCountdownTests;
 			sourceTree = "<group>";
@@ -173,6 +187,8 @@
 				A20000000000000000000025 /* EventTitleEmoji.swift */,
 				A20000000000000000000029 /* EventEmojiResolution.swift */,
 				A20000000000000000000026 /* EventCallLink.swift */,
+				A20000000000000000000030 /* CountdownSchedule.swift */,
+				A20000000000000000000032 /* EventMerger.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -277,6 +293,8 @@
 				A10000000000000000000025 /* EventTitleEmoji.swift in Sources */,
 				A10000000000000000000029 /* EventEmojiResolution.swift in Sources */,
 				A10000000000000000000026 /* EventCallLink.swift in Sources */,
+				A10000000000000000000030 /* CountdownSchedule.swift in Sources */,
+				A10000000000000000000033 /* EventMerger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -289,6 +307,12 @@
 				A10000000000000000000019 /* CountdownFormatter.swift in Tests */,
 				A10000000000000000000028 /* EventCallLink.swift in Tests */,
 				A1000000000000000000002A /* AppConstants.swift in Tests */,
+				A10000000000000000000031 /* CountdownSchedule.swift in Tests */,
+				A10000000000000000000032 /* CountdownScheduleTests.swift in Sources */,
+				A10000000000000000000034 /* EventMerger.swift in Tests */,
+				A10000000000000000000035 /* EventMergerTests.swift in Sources */,
+				A10000000000000000000036 /* CalendarEvent.swift in Tests */,
+				A10000000000000000000037 /* EventKey.swift in Tests */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

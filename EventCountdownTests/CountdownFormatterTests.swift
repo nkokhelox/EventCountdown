@@ -100,4 +100,14 @@ final class CountdownFormatterTests: XCTestCase {
         XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: hour + 30 * minute), "1.5 Hours")
         XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: minute), "1 Min")
     }
+
+    // Whole numbers for >= 2 of the unit; one decimal only in the final "1.x" window.
+    func testMenuBarDecimalTextWholeVersusFractional() {
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 5 * hour), "5 Hours")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 2 * hour), "2 Hours")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: hour + 18 * minute), "1.3 Hours")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 3 * day), "3 Days")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 2 * minute + 30), "2 Mins")
+        XCTAssertEqual(CountdownFormatter.menuBarDecimalText(remaining: 90), "1.5 Mins")
+    }
 }

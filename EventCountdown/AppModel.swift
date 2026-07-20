@@ -68,13 +68,18 @@ final class AppModel {
     func bootstrap() async {
         guard !didBootstrap else { return }
         didBootstrap = true
+        // Re-arm the menu-bar clock whenever the fetched events change (calendar edits,
+        // wake, the periodic refresh) so a newly-appeared or sooner event is picked up.
+        calendarService.onRefresh = { [weak self] in
+            self?.scheduleNextMenuBarUpdate()
+        }
         calendarService.start()
         if calendarService.authorizationState == .notDetermined {
             await calendarService.requestAccess()
         } else {
             await calendarService.refresh()
         }
-        startTickLoop()
+        scheduleNextMenuBarUpdate()
     }
 
     func emojiResolution(for event: CalendarEvent) -> EventEmojiResolution {
@@ -113,12 +118,50 @@ final class AppModel {
         overlappingNextEvent == nil && ongoingEvent != nil
     }
 
+    // The menu-bar label re-renders when this changes. It is advanced only at the exact
+    // moments the label text can change (see CountdownSchedule), not on a fixed 1s poll.
     private(set) var tick = Date()
+    private var menuBarTimer: Timer?
 
-    @MainActor
-    private func startTickLoop() {
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.tick = Date()
+    // Surfaced in the About screen: how often the menu-bar label currently refreshes and
+    // the event driving that cadence. Updated whenever the timer is re-armed.
+    private(set) var menuBarRefreshInterval: TimeInterval?
+    private(set) var menuBarRefreshSourceTitle: String?
+    // The instant the menu-bar label will next update (nil when nothing is scheduled).
+    private(set) var menuBarNextRefresh: Date?
+
+    // Arm a single non-repeating timer for the next instant the menu-bar text changes.
+    // Runs on the main run loop in `.common` mode so it keeps firing while other run-loop
+    // tracking (e.g. the open panel) is in progress. Re-armed on every fire and refresh.
+    private func scheduleNextMenuBarUpdate() {
+        menuBarTimer?.invalidate()
+
+        let now = Date()
+        let event = menuBarEvent
+        let hasStarted = menuBarEventHasStarted
+        menuBarRefreshSourceTitle = event?.title
+        menuBarRefreshInterval = CountdownSchedule.updateCadence(now: now, startDate: event?.startDate, endDate: event?.endDate, hasStarted: hasStarted)
+
+        let fireDate = CountdownSchedule.nextChange(now: now, startDate: event?.startDate, endDate: event?.endDate, hasStarted: hasStarted)
+        guard fireDate < .distantFuture else {
+            // No event to count down: leave no timer armed until the next refresh.
+            menuBarTimer = nil
+            menuBarNextRefresh = nil
+            return
         }
+
+        let interval = max(0, fireDate.timeIntervalSince(now))
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.tick = Date()
+            self.scheduleNextMenuBarUpdate()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        menuBarTimer = timer
+        menuBarNextRefresh = fireDate
+    }
+
+    deinit {
+        menuBarTimer?.invalidate()
     }
 }

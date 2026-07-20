@@ -16,7 +16,13 @@ final class CalendarService {
     private var changeObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
     private var refreshTask: Task<Void, Never>?
+    private var periodicTimer: Timer?
     private var lastDailyRefresh: Date?
+
+    // Invoked on the main actor at the end of every refresh (including the empty,
+    // unauthorized case) so the owner can react to the new event set — e.g. re-arm the
+    // menu-bar countdown clock.
+    var onRefresh: (() -> Void)?
 
     private(set) var authorizationState: CalendarAuthorizationState = .notDetermined
     // All events fetched on the last refresh (past window + future), sorted by start.
@@ -179,26 +185,45 @@ final class CalendarService {
         guard authorizationState == .authorized else {
             fetchedEvents = []
             allCalendars = []
+            onRefresh?()
             return
         }
 
-        allCalendars = eventStore.calendars(for: .event).sorted { $0.title < $1.title }
+        let calendars = eventStore.calendars(for: .event).sorted { $0.title < $1.title }
         if enabledCalendarIDs.isEmpty {
-            enabledCalendarIDs = Set(allCalendars.map(\.calendarIdentifier))
+            enabledCalendarIDs = Set(calendars.map(\.calendarIdentifier))
         }
-
+        let selectedIDs = enabledCalendarIDs
         let now = Date()
-        let end = Calendar.current.date(byAdding: .year, value: AppConstants.fetchHorizonYears, to: now) ?? now
-        let start = Calendar.current.date(byAdding: .day, value: -AppConstants.pastFetchHorizonDays, to: now)
-            ?? now.addingTimeInterval(-AppConstants.ackWindowSeconds)
-        let calendars = allCalendars.filter { enabledCalendarIDs.contains($0.calendarIdentifier) }
-        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: calendars)
-        let ekEvents = eventStore.events(matching: predicate)
 
-        fetchedEvents = ekEvents
-            .map(CalendarEvent.init(from:))
-            .sorted { $0.startDate < $1.startDate }
+        // Snapshot-and-isolate: run the EventKit query + model mapping + sort off the main
+        // thread, then publish the immutable result back on the main actor. The autorelease
+        // pool drains EventKit's temporary objects per fetch instead of at the next run-loop
+        // turn. Mirrors Itsycal's off-main serial-queue fetch (EventCenter.m).
+        let store = eventStore
+        let events: [CalendarEvent] = await Task.detached(priority: .utility) {
+            autoreleasepool {
+                let end = Calendar.current.date(byAdding: .year, value: AppConstants.fetchHorizonYears, to: now) ?? now
+                let start = Calendar.current.date(byAdding: .day, value: -AppConstants.pastFetchHorizonDays, to: now)
+                    ?? now.addingTimeInterval(-AppConstants.ackWindowSeconds)
+                let selected = calendars.filter { selectedIDs.contains($0.calendarIdentifier) }
+                let predicate = store.predicateForEvents(withStart: start, end: end, calendars: selected)
+                let mapped = store.events(matching: predicate)
+                    // Defensive: skip events with no calendar (orphaned / edge cases) —
+                    // CalendarEvent.init force-reads calendar.title/.identifier/.cgColor.
+                    // Mirrors Itsycal skipping nil-colour calendars (issue #152).
+                    .filter { $0.calendar != nil }
+                    .map(CalendarEvent.init(from:))
+                // Collapse the same event appearing in multiple calendars into one.
+                return EventMerger.merge(mapped)
+                    .sorted { $0.startDate < $1.startDate }
+            }
+        }.value
+
+        allCalendars = calendars
+        fetchedEvents = events
         lastDailyRefresh = now
+        onRefresh?()
     }
 
     private func currentAuthorizationState() -> CalendarAuthorizationState {
@@ -239,9 +264,20 @@ final class CalendarService {
             self?.scheduleRefresh(debounce: 0)
         }
 
-        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        periodicTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.scheduleRefresh(debounce: 0)
             self?.refreshDailyIfNeeded()
+        }
+    }
+
+    deinit {
+        periodicTimer?.invalidate()
+        refreshTask?.cancel()
+        if let changeObserver {
+            NotificationCenter.default.removeObserver(changeObserver)
+        }
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
     }
 
