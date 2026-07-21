@@ -14,6 +14,11 @@ struct CalendarEvent: Identifiable, Sendable {
     let calendarTitle: String
     let calendarID: String
     let calendarColor: Color
+    // Merge provenance: an identity shared across calendars, plus the colors and number of
+    // calendars this (possibly merged) event came from. Non-merged events have one color.
+    let externalID: String?
+    let calendarColors: [Color]
+    let calendarCount: Int
 
     var eventKey: EventKey {
         EventKey(from: self)
@@ -44,7 +49,11 @@ struct CalendarEvent: Identifiable, Sendable {
         self.url = event.url
         self.calendarTitle = event.calendar.title
         self.calendarID = event.calendar.calendarIdentifier
-        self.calendarColor = Color(cgColor: event.calendar.cgColor)
+        let color = Color(cgColor: event.calendar.cgColor)
+        self.calendarColor = color
+        self.externalID = event.calendarItemExternalIdentifier
+        self.calendarColors = [color]
+        self.calendarCount = 1
     }
 
     init(from key: EventKey) {
@@ -60,5 +69,44 @@ struct CalendarEvent: Identifiable, Sendable {
         self.calendarTitle = ""
         self.calendarID = key.calendarID
         self.calendarColor = .accentColor
+        self.externalID = nil
+        self.calendarColors = [.accentColor]
+        self.calendarCount = 1
+    }
+
+    // Full initializer for constructing events in the merger and in tests. Optional
+    // parameters default to the non-merged single-calendar case.
+    init(
+        id: String,
+        eventIdentifier: String,
+        title: String,
+        startDate: Date,
+        endDate: Date,
+        calendarTitle: String,
+        calendarID: String,
+        calendarColor: Color,
+        externalID: String? = nil,
+        isAllDay: Bool = false,
+        location: String? = nil,
+        notes: String? = nil,
+        url: URL? = nil,
+        calendarColors: [Color]? = nil,
+        calendarCount: Int? = nil
+    ) {
+        self.id = id
+        self.eventIdentifier = eventIdentifier
+        self.title = title
+        self.startDate = startDate
+        self.endDate = endDate
+        self.calendarTitle = calendarTitle
+        self.calendarID = calendarID
+        self.calendarColor = calendarColor
+        self.externalID = externalID
+        self.isAllDay = isAllDay
+        self.location = location
+        self.notes = notes
+        self.url = url
+        self.calendarColors = calendarColors ?? [calendarColor]
+        self.calendarCount = calendarCount ?? 1
     }
 }

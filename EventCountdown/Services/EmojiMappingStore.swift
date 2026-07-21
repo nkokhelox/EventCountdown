@@ -97,5 +97,8 @@ private extension CalendarEvent {
         self.calendarTitle = sample.calendarTitle
         self.calendarID = UUID().uuidString
         self.calendarColor = .accentColor
+        self.externalID = nil
+        self.calendarColors = [.accentColor]
+        self.calendarCount = 1
     }
 }
