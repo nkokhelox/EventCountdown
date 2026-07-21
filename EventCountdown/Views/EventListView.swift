@@ -851,8 +851,9 @@ private struct MonthCalendarView: View {
                 Circle()
                     .fill(dotColor(inMonth: inMonth, isSelected: isSelected))
                     .frame(width: 4, height: 4)
-                    // Hidden on the selected day so it doesn't clash with the fill circle.
-                    .opacity(hasEvent && !isSelected ? 1 : 0)
+                    // Hidden on the selected day (clashes with the fill circle) and on today
+                    // (the accent ring already marks it, so the dot would be redundant).
+                    .opacity(hasEvent && !isSelected && !isToday ? 1 : 0)
             }
             .contentShape(Rectangle())
         }
