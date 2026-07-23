@@ -127,6 +127,10 @@ struct EventListView: View {
     private var eventsBody: some View {
         VStack(alignment: .leading, spacing: 8) {
             calendarPicker
+            Divider()
+                // Negate the body's horizontal inset so the rule spans the full panel width.
+                .padding(.horizontal, -Self.contentHorizontalPadding)
+                .padding(.vertical, 12)
             // A per-second timeline drives section re-bucketing (an event moves between
             // Upcoming/Now/Past the instant its start/end passes) only while the panel is
             // on screen. It is independent of the menu bar's adaptive clock (AppModel.tick),
