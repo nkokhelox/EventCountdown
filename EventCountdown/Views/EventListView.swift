@@ -928,6 +928,63 @@ private struct MonthCalendarView: View {
     }
 }
 
+// SwiftUI's Picker wraps an intrinsically sized NSPopUpButton on macOS: `.frame` gives it a
+// wider slot but the control still draws at its content width, centred inside. Wrapping the
+// button directly and lowering its horizontal content hugging lets it fill the slot.
+private struct FullWidthCalendarPicker: NSViewRepresentable {
+    @Binding var selection: String
+    var calendars: [EKCalendar]
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionChanged(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.parent = self
+
+        // Menu items are built by hand rather than with addItems(withTitles:), which drops
+        // duplicates — two calendars can legitimately share a title.
+        let identifiers = calendars.map(\.calendarIdentifier)
+        if context.coordinator.identifiers != identifiers {
+            context.coordinator.identifiers = identifiers
+            button.menu?.removeAllItems()
+            for calendar in calendars {
+                button.menu?.addItem(NSMenuItem(title: calendar.title, action: nil, keyEquivalent: ""))
+            }
+        }
+
+        if let index = identifiers.firstIndex(of: selection) {
+            button.selectItem(at: index)
+        }
+    }
+
+    // Report no ideal width of its own so the button never widens the grid that lays it out —
+    // it still fills whatever concrete width it is offered, which is how its trailing edge
+    // ends up flush with the rows below.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 0, height: nsView.intrinsicContentSize.height)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject {
+        var parent: FullWidthCalendarPicker
+        var identifiers: [String] = []
+
+        init(_ parent: FullWidthCalendarPicker) { self.parent = parent }
+
+        @objc func selectionChanged(_ sender: NSPopUpButton) {
+            guard parent.calendars.indices.contains(sender.indexOfSelectedItem) else { return }
+            parent.selection = parent.calendars[sender.indexOfSelectedItem].calendarIdentifier
+        }
+    }
+}
+
 private struct AddEventForm: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
@@ -963,10 +1020,28 @@ private struct AddEventForm: View {
                     // Grid so the labels share a column instead of each control setting its own
                     // indent, which left the rows visibly ragged.
                     Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                        // Spans both columns so the selector ends flush with the rows below
+                        // rather than running past them.
+                        GridRow {
+                            FullWidthCalendarPicker(selection: $calendarID, calendars: writableCalendars)
+                                .gridCellColumns(2)
+                        }
                         // Both rows are a bordered field of the same width plus the same
                         // SwiftUI Stepper. The date picker uses .field rather than
                         // .stepperField so it contributes no stepper of its own — its built-in
                         // one is smaller than a standalone NSStepper and the two never matched.
+                        // Labelled "Minutes" rather than "Duration" with a trailing "min" — at
+                        // panel width the suffix wraps onto a second line.
+                        GridRow {
+                            Text("Minutes")
+                            HStack(spacing: 4) {
+                                TextField("", value: $durationMinutes, format: .number)
+                                    .textFieldStyle(.squareBorder)
+                                    .frame(width: Self.valueFieldWidth)
+                                Stepper("", value: $durationMinutes, in: Self.durationRange, step: 15)
+                                    .labelsHidden()
+                            }
+                        }
                         GridRow {
                             Text("Time")
                             HStack(spacing: 4) {
@@ -982,27 +1057,10 @@ private struct AddEventForm: View {
                                 .labelsHidden()
                             }
                         }
-                        GridRow {
-                            Text("Duration")
-                            HStack(spacing: 4) {
-                                TextField("", value: $durationMinutes, format: .number)
-                                    .textFieldStyle(.squareBorder)
-                                    .frame(width: Self.valueFieldWidth)
-                                Stepper("", value: $durationMinutes, in: Self.durationRange, step: 15)
-                                    .labelsHidden()
-                                Text("min")
-                            }
-                        }
-                        GridRow {
-                            Text("Calendar")
-                            Picker("", selection: $calendarID) {
-                                ForEach(writableCalendars, id: \.calendarIdentifier) { calendar in
-                                    Text(calendar.title).tag(calendar.calendarIdentifier)
-                                }
-                            }
-                            .labelsHidden()
-                        }
                     }
+                    // Size the grid from its own rows so the spanning selector fills that
+                    // width rather than stretching the grid to the column.
+                    .fixedSize(horizontal: true, vertical: false)
 
                     // Pushes the buttons to the bottom of the column so they line up with the
                     // base of the calendar beside them.
@@ -1019,7 +1077,8 @@ private struct AddEventForm: View {
             }
         }
         .padding(14)
-        .frame(width: 400)
+        // Matches MenuBarPanelMetrics.panelWidth so the popover doesn't overhang the panel.
+        .frame(width: MenuBarPanelMetrics.panelWidth)
         // Duration is now typed as well as stepped, and typing ignores the stepper's range.
         .onChange(of: durationMinutes) { _, newValue in
             let clamped = min(max(newValue, Self.durationRange.lowerBound), Self.durationRange.upperBound)
