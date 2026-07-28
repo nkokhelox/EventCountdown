@@ -945,8 +945,11 @@ private struct AddEventForm: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.roundedBorder)
 
+            // Graphical style draws the calendar and clock inline. The compact style opens them
+            // in a separate system window, which makes the menu bar panel resign key — SwiftUI
+            // then tears the panel down, taking this form with it before a date can be picked.
             DatePicker("Starts", selection: $start)
-                .datePickerStyle(.compact)
+                .datePickerStyle(.graphical)
 
             Stepper("Duration: \(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
 
