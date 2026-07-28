@@ -1020,8 +1020,8 @@ private struct AddEventForm: View {
                     // Grid so the labels share a column instead of each control setting its own
                     // indent, which left the rows visibly ragged.
                     Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
-                        // Spans both columns so the selector ends flush with the rows below
-                        // rather than running past them.
+                        // Spans both columns so the selector ends on the shared trailing edge
+                        // rather than short of it.
                         GridRow {
                             FullWidthCalendarPicker(selection: $calendarID, calendars: writableCalendars)
                                 .gridCellColumns(2)
@@ -1032,19 +1032,25 @@ private struct AddEventForm: View {
                         // one is smaller than a standalone NSStepper and the two never matched.
                         // Labelled "Minutes" rather than "Duration" with a trailing "min" — at
                         // panel width the suffix wraps onto a second line.
+                        // The leading Spacer pushes each field and its stepper to the trailing
+                        // edge, so every row ends on the same x as the selector above and the
+                        // title field and buttons outside the column.
                         GridRow {
                             Text("Minutes")
                             HStack(spacing: 4) {
+                                Spacer(minLength: 0)
                                 TextField("", value: $durationMinutes, format: .number)
                                     .textFieldStyle(.squareBorder)
                                     .frame(width: Self.valueFieldWidth)
                                 Stepper("", value: $durationMinutes, in: Self.durationRange, step: 15)
                                     .labelsHidden()
                             }
+                            .frame(maxWidth: .infinity)
                         }
                         GridRow {
                             Text("Time")
                             HStack(spacing: 4) {
+                                Spacer(minLength: 0)
                                 DatePicker("", selection: $start, displayedComponents: .hourAndMinute)
                                     .datePickerStyle(.field)
                                     .labelsHidden()
@@ -1056,11 +1062,9 @@ private struct AddEventForm: View {
                                 }
                                 .labelsHidden()
                             }
+                            .frame(maxWidth: .infinity)
                         }
                     }
-                    // Size the grid from its own rows so the spanning selector fills that
-                    // width rather than stretching the grid to the column.
-                    .fixedSize(horizontal: true, vertical: false)
 
                     // Pushes the buttons to the bottom of the column so they line up with the
                     // base of the calendar beside them.
