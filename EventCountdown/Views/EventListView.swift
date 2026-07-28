@@ -182,10 +182,10 @@ struct EventListView: View {
                 pastSection(past)
             }
             if !nowEvents.isEmpty {
-                nowSection(nowEvents, showsSettings: past == nil)
+                nowSection(nowEvents, showsAddButton: past == nil)
             }
             if !next.isEmpty {
-                nextSection(next, showsSettings: past == nil && nowEvents.isEmpty)
+                nextSection(next, showsAddButton: past == nil && nowEvents.isEmpty)
             }
             // The selected day's events live below the time-relative sections. Today shows
             // the full live upcoming list (as before); any other day shows just that day.
@@ -198,32 +198,32 @@ struct EventListView: View {
     private func selectedDaySection(now: Date, hasPast: Bool, nowEvents: [CalendarEvent], next: [CalendarEvent]) -> some View {
         // The settings gear lives in the first visible section header; it lands here only
         // when there is no Past / Now / Next section above.
-        let showsSettings = !hasPast && nowEvents.isEmpty && next.isEmpty
+        let showsAddButton = !hasPast && nowEvents.isEmpty && next.isEmpty
         if isTodaySelected {
             let remaining = remainingPanelEvents(now: now)
             if !remaining.isEmpty {
-                upcomingHeader(showsSettings: showsSettings)
+                upcomingHeader(showsAddButton: showsAddButton)
                 upcomingEventsList(now: now)
             } else if next.isEmpty {
-                upcomingHeader(showsSettings: showsSettings)
+                upcomingHeader(showsAddButton: showsAddButton)
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
             }
         } else {
-            selectedDayList(showsSettings: showsSettings)
+            selectedDayList(showsAddButton: showsAddButton)
         }
     }
 
     @ViewBuilder
-    private func selectedDayList(showsSettings: Bool) -> some View {
+    private func selectedDayList(showsAddButton: Bool) -> some View {
         let events = eventsOnSelectedDay
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(dayDividerLabel(selectedDay))
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             if events.isEmpty {
@@ -277,20 +277,20 @@ struct EventListView: View {
                 Text("Past")
                     .font(.headline)
                 Spacer()
-                settingsButton
+                addButton
             }
             eventRow(event, showDivider: false, mode: .past)
         }
     }
 
-    private func nowSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+    private func nowSection(_ events: [CalendarEvent], showsAddButton: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Now")
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -302,14 +302,14 @@ struct EventListView: View {
     // The soonest upcoming event(s). Usually one; when several share the exact same
     // earliest start time (a start-time conflict) they all appear here, tinted a deeper
     // red than the ongoing "Now" rows.
-    private func nextSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+    private func nextSection(_ events: [CalendarEvent], showsAddButton: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Next")
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -318,13 +318,13 @@ struct EventListView: View {
         }
     }
 
-    private func upcomingHeader(showsSettings: Bool) -> some View {
+    private func upcomingHeader(showsAddButton: Bool) -> some View {
         HStack {
             Text("Upcoming")
                 .font(.headline)
             Spacer()
-            if showsSettings {
-                settingsButton
+            if showsAddButton {
+                addButton
             }
         }
     }
@@ -346,10 +346,10 @@ struct EventListView: View {
         }
         .buttonStyle(.borderless)
         .accessibilityLabel("Add Event")
-        // The button lives in the footer, so anchoring the arrow to the bottom opens the form
-        // upward over the panel. Anchoring it to the top pushed the form off the bottom of the
-        // screen, where its own controls got clipped.
-        .popover(isPresented: $isAddingEvent, arrowEdge: .bottom) {
+        // The button sits in a section header partway down the panel, so the form opens
+        // downward over the list below it. It has room there; anchored the other way it would
+        // run up into the menu bar when the first section is near the top of the panel.
+        .popover(isPresented: $isAddingEvent, arrowEdge: .top) {
             AddEventForm()
                 .environment(appModel)
         }
@@ -681,7 +681,7 @@ struct EventListView: View {
 
     private var footer: some View {
         HStack {
-            addButton
+            settingsButton
             Spacer()
             Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power")
