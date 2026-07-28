@@ -346,7 +346,10 @@ struct EventListView: View {
         }
         .buttonStyle(.borderless)
         .accessibilityLabel("Add Event")
-        .popover(isPresented: $isAddingEvent, arrowEdge: .top) {
+        // The button lives in the footer, so anchoring the arrow to the bottom opens the form
+        // upward over the panel. Anchoring it to the top pushed the form off the bottom of the
+        // screen, where its own controls got clipped.
+        .popover(isPresented: $isAddingEvent, arrowEdge: .bottom) {
             AddEventForm()
                 .environment(appModel)
         }
