@@ -938,6 +938,11 @@ private struct AddEventForm: View {
     @State private var calendarID = ""
     @State private var isSaving = false
 
+    // Shared by the Time and Duration fields so the two rows line up exactly.
+    private static let valueFieldWidth: CGFloat = 54
+    private static let timeStepMinutes = 5
+    private static let durationRange = 15...600
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("New Event").font(.headline)
@@ -958,16 +963,35 @@ private struct AddEventForm: View {
                     // Grid so the labels share a column instead of each control setting its own
                     // indent, which left the rows visibly ragged.
                     Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                        // Both rows are a bordered field of the same width plus the same
+                        // SwiftUI Stepper. The date picker uses .field rather than
+                        // .stepperField so it contributes no stepper of its own — its built-in
+                        // one is smaller than a standalone NSStepper and the two never matched.
                         GridRow {
                             Text("Time")
-                            DatePicker("", selection: $start, displayedComponents: .hourAndMinute)
-                                .datePickerStyle(.stepperField)
+                            HStack(spacing: 4) {
+                                DatePicker("", selection: $start, displayedComponents: .hourAndMinute)
+                                    .datePickerStyle(.field)
+                                    .labelsHidden()
+                                    .frame(width: Self.valueFieldWidth)
+                                Stepper("") {
+                                    start.addTimeInterval(TimeInterval(Self.timeStepMinutes * 60))
+                                } onDecrement: {
+                                    start.addTimeInterval(TimeInterval(-Self.timeStepMinutes * 60))
+                                }
                                 .labelsHidden()
+                            }
                         }
                         GridRow {
                             Text("Duration")
-                            Stepper("\(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
-                                .fixedSize()
+                            HStack(spacing: 4) {
+                                TextField("", value: $durationMinutes, format: .number)
+                                    .textFieldStyle(.squareBorder)
+                                    .frame(width: Self.valueFieldWidth)
+                                Stepper("", value: $durationMinutes, in: Self.durationRange, step: 15)
+                                    .labelsHidden()
+                                Text("min")
+                            }
                         }
                         GridRow {
                             Text("Calendar")
@@ -996,6 +1020,11 @@ private struct AddEventForm: View {
         }
         .padding(14)
         .frame(width: 400)
+        // Duration is now typed as well as stepped, and typing ignores the stepper's range.
+        .onChange(of: durationMinutes) { _, newValue in
+            let clamped = min(max(newValue, Self.durationRange.lowerBound), Self.durationRange.upperBound)
+            if clamped != newValue { durationMinutes = clamped }
+        }
         .onAppear {
             if calendarID.isEmpty {
                 calendarID = writableCalendars.first?.calendarIdentifier ?? ""
