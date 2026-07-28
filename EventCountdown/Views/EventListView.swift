@@ -945,30 +945,57 @@ private struct AddEventForm: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.roundedBorder)
 
-            // Graphical style draws the calendar and clock inline. The compact style opens them
-            // in a separate system window, which makes the menu bar panel resign key — SwiftUI
-            // then tears the panel down, taking this form with it before a date can be picked.
-            DatePicker("Starts", selection: $start)
-                .datePickerStyle(.graphical)
+            // Both pickers edit `start` inline — no secondary system window, which would take
+            // key and make SwiftUI tear the panel down mid-edit. The graphical style is split to
+            // the date alone because its time half is a read-only analog clock; the time gets a
+            // stepper field so it can actually be typed.
+            HStack(alignment: .top, spacing: 14) {
+                DatePicker("", selection: $start, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
 
-            Stepper("Duration: \(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
+                VStack(alignment: .leading, spacing: 8) {
+                    // Grid so the labels share a column instead of each control setting its own
+                    // indent, which left the rows visibly ragged.
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                        GridRow {
+                            Text("Time")
+                            DatePicker("", selection: $start, displayedComponents: .hourAndMinute)
+                                .datePickerStyle(.stepperField)
+                                .labelsHidden()
+                        }
+                        GridRow {
+                            Text("Duration")
+                            Stepper("\(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
+                                .fixedSize()
+                        }
+                        GridRow {
+                            Text("Calendar")
+                            Picker("", selection: $calendarID) {
+                                ForEach(writableCalendars, id: \.calendarIdentifier) { calendar in
+                                    Text(calendar.title).tag(calendar.calendarIdentifier)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                    }
 
-            Picker("Calendar", selection: $calendarID) {
-                ForEach(writableCalendars, id: \.calendarIdentifier) { calendar in
-                    Text(calendar.title).tag(calendar.calendarIdentifier)
+                    // Pushes the buttons to the bottom of the column so they line up with the
+                    // base of the calendar beside them.
+                    Spacer(minLength: 0)
+
+                    HStack {
+                        Spacer()
+                        Button("Cancel") { dismiss() }
+                        Button("Add") { addEvent() }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                    }
                 }
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Add") { addEvent() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
             }
         }
         .padding(14)
-        .frame(width: 300)
+        .frame(width: 400)
         .onAppear {
             if calendarID.isEmpty {
                 calendarID = writableCalendars.first?.calendarIdentifier ?? ""
