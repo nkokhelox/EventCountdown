@@ -34,6 +34,20 @@ enum CountdownUnit: String, CaseIterable {
         case .seconds: return plural ? "secs" : "sec"
         }
     }
+
+    // Single letter for the tightest labels. Months and minutes deliberately share "m" —
+    // the two never appear in the same reading, since only one unit is ever shown.
+    var letter: String {
+        switch self {
+        case .years: return "y"
+        case .months: return "m"
+        case .weeks: return "w"
+        case .days: return "d"
+        case .hours: return "h"
+        case .minutes: return "m"
+        case .seconds: return "s"
+        }
+    }
 }
 
 struct CountdownValue: Equatable, Sendable {
@@ -176,6 +190,27 @@ enum CountdownFormatter {
         if hours > 0 { parts.append("\(hours) \(hours == 1 ? "hr" : "hrs")") }
         if minutes > 0 { parts.append("\(minutes) \(minutes == 1 ? "min" : "mins")") }
         return parts.isEmpty ? "0 mins" : parts.joined(separator: " ")
+    }
+
+    // Event length on the same single-unit decimal scale the menu bar uses, with the unit as
+    // one letter and no space, e.g. "45m", "1.5h", "2d". Sharing menuBarUnit keeps the two
+    // from drifting apart, which also means "1 <unit>" never appears — a one-hour event reads
+    // "60m", the same handoff the menu bar makes.
+    static func compactDurationText(_ interval: TimeInterval) -> String {
+        guard interval > 0 else { return "0m" }
+
+        let (unit, unitSeconds) = menuBarUnit(for: interval)
+        if unit == .seconds {
+            return "\(Int(interval.rounded(.up)))\(unit.letter)"
+        }
+
+        // Truncated rather than rounded so the label never overstates the length.
+        let raw = interval / unitSeconds
+        if raw >= 2 {
+            return "\(Int(raw.rounded(.down)))\(unit.letter)"
+        }
+        let value = max(1.1, (raw * 10).rounded(.down) / 10)
+        return "\(String(format: "%.1f", value))\(unit.letter)"
     }
 
     static func agoText(elapsed interval: TimeInterval) -> String {

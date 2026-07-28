@@ -89,6 +89,24 @@ final class CountdownFormatterTests: XCTestCase {
         XCTAssertEqual(text, "2 days 3 hours")
     }
 
+    func testCompactDurationTextUsesSingleMajorUnit() {
+        XCTAssertEqual(CountdownFormatter.compactDurationText(45 * minute), "45m")
+        XCTAssertEqual(CountdownFormatter.compactDurationText(hour + 30 * minute), "1.5h")
+        XCTAssertEqual(CountdownFormatter.compactDurationText(2 * day + 3 * hour), "2d")
+    }
+
+    // Same handoff as the menu bar: a unit is abandoned before its value reaches 1.0, so a
+    // one-hour event reads in minutes rather than as "1h".
+    func testCompactDurationTextNeverShowsOneOfAUnit() {
+        XCTAssertEqual(CountdownFormatter.compactDurationText(hour), "60m")
+        XCTAssertEqual(CountdownFormatter.compactDurationText(day), "24h")
+    }
+
+    func testCompactDurationTextZeroAndNegativeReadAsZeroMinutes() {
+        XCTAssertEqual(CountdownFormatter.compactDurationText(0), "0m")
+        XCTAssertEqual(CountdownFormatter.compactDurationText(-hour), "0m")
+    }
+
     func testOngoingLabelIsCapitalized() {
         XCTAssertEqual(CountdownFormatter.ongoingLabel(elapsedSinceStart: 0), "Now")
         XCTAssertEqual(CountdownFormatter.ongoingLabel(elapsedSinceStart: 2 * minute), "Ongoing")

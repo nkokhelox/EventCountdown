@@ -712,9 +712,10 @@ struct EventListView: View {
         return formatter.string(from: date)
     }
 
-    // Row subtitle: upcoming rows show the start date-time; the Next event shows
-    // "at <start> for <length>"; an ongoing event shows how much of it is left; a past
-    // event shows the time it ended.
+    // Row subtitle: upcoming rows show the start date-time followed by the event's length in
+    // brackets, e.g. "29 Jul at 09:00 (for 1.5h)"; the Next event shows "at <start> for
+    // <length>"; an ongoing event shows how much of it is left; a past event shows the time it
+    // ended.
     private func rowSubtitle(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
         switch mode {
         case .next:
@@ -725,7 +726,11 @@ struct EventListView: View {
         case .past:
             return event.isAllDay ? "all day" : Self.timeFormatter.string(from: event.endDate)
         case .upcoming:
-            return formattedStart(event.startDate)
+            let start = formattedStart(event.startDate)
+            // An all-day event's length is the day itself, so the bracket would add nothing.
+            guard !event.isAllDay else { return start }
+            let duration = CountdownFormatter.compactDurationText(event.endDate.timeIntervalSince(event.startDate))
+            return "\(start) (for \(duration))"
         }
     }
 
