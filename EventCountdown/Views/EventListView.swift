@@ -182,10 +182,10 @@ struct EventListView: View {
                 pastSection(past)
             }
             if !nowEvents.isEmpty {
-                nowSection(nowEvents, showsSettings: past == nil)
+                nowSection(nowEvents, showsAddButton: past == nil)
             }
             if !next.isEmpty {
-                nextSection(next, showsSettings: past == nil && nowEvents.isEmpty)
+                nextSection(next, showsAddButton: past == nil && nowEvents.isEmpty)
             }
             // The selected day's events live below the time-relative sections. Today shows
             // the full live upcoming list (as before); any other day shows just that day.
@@ -198,32 +198,32 @@ struct EventListView: View {
     private func selectedDaySection(now: Date, hasPast: Bool, nowEvents: [CalendarEvent], next: [CalendarEvent]) -> some View {
         // The settings gear lives in the first visible section header; it lands here only
         // when there is no Past / Now / Next section above.
-        let showsSettings = !hasPast && nowEvents.isEmpty && next.isEmpty
+        let showsAddButton = !hasPast && nowEvents.isEmpty && next.isEmpty
         if isTodaySelected {
             let remaining = remainingPanelEvents(now: now)
             if !remaining.isEmpty {
-                upcomingHeader(showsSettings: showsSettings)
+                upcomingHeader(showsAddButton: showsAddButton)
                 upcomingEventsList(now: now)
             } else if next.isEmpty {
-                upcomingHeader(showsSettings: showsSettings)
+                upcomingHeader(showsAddButton: showsAddButton)
                 Text("No upcoming events in the selected calendars.")
                     .foregroundStyle(.secondary)
             }
         } else {
-            selectedDayList(showsSettings: showsSettings)
+            selectedDayList(showsAddButton: showsAddButton)
         }
     }
 
     @ViewBuilder
-    private func selectedDayList(showsSettings: Bool) -> some View {
+    private func selectedDayList(showsAddButton: Bool) -> some View {
         let events = eventsOnSelectedDay
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(dayDividerLabel(selectedDay))
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             if events.isEmpty {
@@ -277,20 +277,20 @@ struct EventListView: View {
                 Text("Past")
                     .font(.headline)
                 Spacer()
-                settingsButton
+                addButton
             }
             eventRow(event, showDivider: false, mode: .past)
         }
     }
 
-    private func nowSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+    private func nowSection(_ events: [CalendarEvent], showsAddButton: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Now")
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -302,14 +302,14 @@ struct EventListView: View {
     // The soonest upcoming event(s). Usually one; when several share the exact same
     // earliest start time (a start-time conflict) they all appear here, tinted a deeper
     // red than the ongoing "Now" rows.
-    private func nextSection(_ events: [CalendarEvent], showsSettings: Bool) -> some View {
+    private func nextSection(_ events: [CalendarEvent], showsAddButton: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Next")
                     .font(.headline)
                 Spacer()
-                if showsSettings {
-                    settingsButton
+                if showsAddButton {
+                    addButton
                 }
             }
             ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
@@ -318,13 +318,13 @@ struct EventListView: View {
         }
     }
 
-    private func upcomingHeader(showsSettings: Bool) -> some View {
+    private func upcomingHeader(showsAddButton: Bool) -> some View {
         HStack {
             Text("Upcoming")
                 .font(.headline)
             Spacer()
-            if showsSettings {
-                settingsButton
+            if showsAddButton {
+                addButton
             }
         }
     }
@@ -346,6 +346,9 @@ struct EventListView: View {
         }
         .buttonStyle(.borderless)
         .accessibilityLabel("Add Event")
+        // The button sits in a section header partway down the panel, so the form opens
+        // downward over the list below it. It has room there; anchored the other way it would
+        // run up into the menu bar when the first section is near the top of the panel.
         .popover(isPresented: $isAddingEvent, arrowEdge: .top) {
             AddEventForm()
                 .environment(appModel)
@@ -678,7 +681,7 @@ struct EventListView: View {
 
     private var footer: some View {
         HStack {
-            addButton
+            settingsButton
             Spacer()
             Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power")
@@ -709,9 +712,10 @@ struct EventListView: View {
         return formatter.string(from: date)
     }
 
-    // Row subtitle: upcoming rows show the start date-time; the Next event shows
-    // "at <start> for <length>"; an ongoing event shows how much of it is left; a past
-    // event shows the time it ended.
+    // Row subtitle: upcoming rows show the start date-time followed by the event's length in
+    // brackets, e.g. "29 Jul at 09:00 (for 1.5h)"; the Next event shows "at <start> for
+    // <length>"; an ongoing event shows how much of it is left; a past event shows the time it
+    // ended.
     private func rowSubtitle(for event: CalendarEvent, mode: EventRowMode, now: Date) -> String {
         switch mode {
         case .next:
@@ -722,7 +726,11 @@ struct EventListView: View {
         case .past:
             return event.isAllDay ? "all day" : Self.timeFormatter.string(from: event.endDate)
         case .upcoming:
-            return formattedStart(event.startDate)
+            let start = formattedStart(event.startDate)
+            // An all-day event's length is the day itself, so the bracket would add nothing.
+            guard !event.isAllDay else { return start }
+            let duration = CountdownFormatter.compactDurationText(event.endDate.timeIntervalSince(event.startDate))
+            return "\(start) (for \(duration))"
         }
     }
 
@@ -925,6 +933,63 @@ private struct MonthCalendarView: View {
     }
 }
 
+// SwiftUI's Picker wraps an intrinsically sized NSPopUpButton on macOS: `.frame` gives it a
+// wider slot but the control still draws at its content width, centred inside. Wrapping the
+// button directly and lowering its horizontal content hugging lets it fill the slot.
+private struct FullWidthCalendarPicker: NSViewRepresentable {
+    @Binding var selection: String
+    var calendars: [EKCalendar]
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionChanged(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.parent = self
+
+        // Menu items are built by hand rather than with addItems(withTitles:), which drops
+        // duplicates — two calendars can legitimately share a title.
+        let identifiers = calendars.map(\.calendarIdentifier)
+        if context.coordinator.identifiers != identifiers {
+            context.coordinator.identifiers = identifiers
+            button.menu?.removeAllItems()
+            for calendar in calendars {
+                button.menu?.addItem(NSMenuItem(title: calendar.title, action: nil, keyEquivalent: ""))
+            }
+        }
+
+        if let index = identifiers.firstIndex(of: selection) {
+            button.selectItem(at: index)
+        }
+    }
+
+    // Report no ideal width of its own so the button never widens the grid that lays it out —
+    // it still fills whatever concrete width it is offered, which is how its trailing edge
+    // ends up flush with the rows below.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSPopUpButton, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 0, height: nsView.intrinsicContentSize.height)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject {
+        var parent: FullWidthCalendarPicker
+        var identifiers: [String] = []
+
+        init(_ parent: FullWidthCalendarPicker) { self.parent = parent }
+
+        @objc func selectionChanged(_ sender: NSPopUpButton) {
+            guard parent.calendars.indices.contains(sender.indexOfSelectedItem) else { return }
+            parent.selection = parent.calendars[sender.indexOfSelectedItem].calendarIdentifier
+        }
+    }
+}
+
 private struct AddEventForm: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.dismiss) private var dismiss
@@ -935,6 +1000,11 @@ private struct AddEventForm: View {
     @State private var calendarID = ""
     @State private var isSaving = false
 
+    // Shared by the Time and Duration fields so the two rows line up exactly.
+    private static let valueFieldWidth: CGFloat = 54
+    private static let timeStepMinutes = 5
+    private static let durationRange = 15...600
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("New Event").font(.headline)
@@ -942,27 +1012,87 @@ private struct AddEventForm: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.roundedBorder)
 
-            DatePicker("Starts", selection: $start)
-                .datePickerStyle(.compact)
+            // Both pickers edit `start` inline — no secondary system window, which would take
+            // key and make SwiftUI tear the panel down mid-edit. The graphical style is split to
+            // the date alone because its time half is a read-only analog clock; the time gets a
+            // stepper field so it can actually be typed.
+            HStack(alignment: .top, spacing: 14) {
+                DatePicker("", selection: $start, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
 
-            Stepper("Duration: \(durationMinutes) min", value: $durationMinutes, in: 15...600, step: 15)
+                VStack(alignment: .leading, spacing: 8) {
+                    // Grid so the labels share a column instead of each control setting its own
+                    // indent, which left the rows visibly ragged.
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                        // Spans both columns so the selector ends on the shared trailing edge
+                        // rather than short of it.
+                        GridRow {
+                            FullWidthCalendarPicker(selection: $calendarID, calendars: writableCalendars)
+                                .gridCellColumns(2)
+                        }
+                        // Both rows are a bordered field of the same width plus the same
+                        // SwiftUI Stepper. The date picker uses .field rather than
+                        // .stepperField so it contributes no stepper of its own — its built-in
+                        // one is smaller than a standalone NSStepper and the two never matched.
+                        // Labelled "Minutes" rather than "Duration" with a trailing "min" — at
+                        // panel width the suffix wraps onto a second line.
+                        // The leading Spacer pushes each field and its stepper to the trailing
+                        // edge, so every row ends on the same x as the selector above and the
+                        // title field and buttons outside the column.
+                        GridRow {
+                            Text("Minutes")
+                            HStack(spacing: 4) {
+                                Spacer(minLength: 0)
+                                TextField("", value: $durationMinutes, format: .number)
+                                    .textFieldStyle(.squareBorder)
+                                    .frame(width: Self.valueFieldWidth)
+                                Stepper("", value: $durationMinutes, in: Self.durationRange, step: 15)
+                                    .labelsHidden()
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        GridRow {
+                            Text("Time")
+                            HStack(spacing: 4) {
+                                Spacer(minLength: 0)
+                                DatePicker("", selection: $start, displayedComponents: .hourAndMinute)
+                                    .datePickerStyle(.field)
+                                    .labelsHidden()
+                                    .frame(width: Self.valueFieldWidth)
+                                Stepper("") {
+                                    start.addTimeInterval(TimeInterval(Self.timeStepMinutes * 60))
+                                } onDecrement: {
+                                    start.addTimeInterval(TimeInterval(-Self.timeStepMinutes * 60))
+                                }
+                                .labelsHidden()
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
 
-            Picker("Calendar", selection: $calendarID) {
-                ForEach(writableCalendars, id: \.calendarIdentifier) { calendar in
-                    Text(calendar.title).tag(calendar.calendarIdentifier)
+                    // Pushes the buttons to the bottom of the column so they line up with the
+                    // base of the calendar beside them.
+                    Spacer(minLength: 0)
+
+                    HStack {
+                        Spacer()
+                        Button("Cancel") { dismiss() }
+                        Button("Add") { addEvent() }
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                    }
                 }
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Add") { addEvent() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
             }
         }
         .padding(14)
-        .frame(width: 300)
+        // Matches MenuBarPanelMetrics.panelWidth so the popover doesn't overhang the panel.
+        .frame(width: MenuBarPanelMetrics.panelWidth)
+        // Duration is now typed as well as stepped, and typing ignores the stepper's range.
+        .onChange(of: durationMinutes) { _, newValue in
+            let clamped = min(max(newValue, Self.durationRange.lowerBound), Self.durationRange.upperBound)
+            if clamped != newValue { durationMinutes = clamped }
+        }
         .onAppear {
             if calendarID.isEmpty {
                 calendarID = writableCalendars.first?.calendarIdentifier ?? ""
