@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
+
+      - name: Run tests
+        run: |
+          xcodebuild \
+            -project EventCountdown.xcodeproj \
+            -scheme EventCountdown \
+            -destination 'platform=macOS' \
+            test
