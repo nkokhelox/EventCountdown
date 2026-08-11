@@ -40,6 +40,12 @@
 		A10000000000000000000035 /* EventMergerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* EventMergerTests.swift */; };
 		A10000000000000000000036 /* CalendarEvent.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* CalendarEvent.swift */; };
 		A10000000000000000000037 /* EventKey.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* EventKey.swift */; };
+		A10000000000000000000038 /* EventKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* EventKeyTests.swift */; };
+		A10000000000000000000039 /* EmojiRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* EmojiRuleTests.swift */; };
+		A1000000000000000000003A /* EventTitleEmojiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* EventTitleEmojiTests.swift */; };
+		A1000000000000000000003B /* EmojiRule.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* EmojiRule.swift */; };
+		A1000000000000000000003C /* EventTitleEmoji.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* EventTitleEmoji.swift */; };
+		A1000000000000000000003D /* EventEmojiResolution.swift in Tests */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* EventEmojiResolution.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +88,9 @@
 		A20000000000000000000031 /* CountdownScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownScheduleTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000032 /* EventMerger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMerger.swift; sourceTree = "<group>"; };
 		A20000000000000000000033 /* EventMergerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventMergerTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* EventKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventKeyTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* EmojiRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmojiRuleTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* EventTitleEmojiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTitleEmojiTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +144,9 @@
 				A20000000000000000000027 /* EventCallLinkTests.swift */,
 				A20000000000000000000031 /* CountdownScheduleTests.swift */,
 				A20000000000000000000033 /* EventMergerTests.swift */,
+				A20000000000000000000034 /* EventKeyTests.swift */,
+				A20000000000000000000035 /* EmojiRuleTests.swift */,
+				A20000000000000000000036 /* EventTitleEmojiTests.swift */,
 			);
 			path = EventCountdownTests;
 			sourceTree = "<group>";
@@ -313,6 +325,12 @@
 				A10000000000000000000035 /* EventMergerTests.swift in Sources */,
 				A10000000000000000000036 /* CalendarEvent.swift in Tests */,
 				A10000000000000000000037 /* EventKey.swift in Tests */,
+				A10000000000000000000038 /* EventKeyTests.swift in Sources */,
+				A10000000000000000000039 /* EmojiRuleTests.swift in Sources */,
+				A1000000000000000000003A /* EventTitleEmojiTests.swift in Sources */,
+				A1000000000000000000003B /* EmojiRule.swift in Tests */,
+				A1000000000000000000003C /* EventTitleEmoji.swift in Tests */,
+				A1000000000000000000003D /* EventEmojiResolution.swift in Tests */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
