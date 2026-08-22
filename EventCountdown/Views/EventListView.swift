@@ -33,6 +33,7 @@ struct EventListView: View {
         case next
         case now
         case past
+        case allDay
     }
 
     var body: some View {
@@ -175,30 +176,37 @@ struct EventListView: View {
     @ViewBuilder
     private func sectionsBody(now: Date) -> some View {
         let past = visiblePastEvent(now: now)
-        let nowEvents = appModel.calendarService.nowEvents
+        // All-day events get their own section, separate from the timed "Now" events, and
+        // only appear while today is selected — an all-day event is a property of today,
+        // not of whichever day happens to be picked in the calendar.
+        let allDayEvents: [CalendarEvent] = isTodaySelected ? appModel.calendarService.nowEvents.filter(\.isAllDay) : []
+        let nowEvents = appModel.calendarService.nowEvents.filter { !$0.isAllDay }
         let next = nextEvents(now: now)
         VStack(alignment: .leading, spacing: allDaysCollapsed ? 6 : 8) {
             if let past {
                 pastSection(past)
             }
+            if !allDayEvents.isEmpty {
+                allDaySection(allDayEvents, showsAddButton: past == nil)
+            }
             if !nowEvents.isEmpty {
-                nowSection(nowEvents, showsAddButton: past == nil)
+                nowSection(nowEvents, showsAddButton: past == nil && allDayEvents.isEmpty)
             }
             if !next.isEmpty {
-                nextSection(next, showsAddButton: past == nil && nowEvents.isEmpty)
+                nextSection(next, showsAddButton: past == nil && allDayEvents.isEmpty && nowEvents.isEmpty)
             }
             // The selected day's events live below the time-relative sections. Today shows
             // the full live upcoming list (as before); any other day shows just that day.
-            selectedDaySection(now: now, hasPast: past != nil, nowEvents: nowEvents, next: next)
+            selectedDaySection(now: now, hasPast: past != nil, allDayEvents: allDayEvents, nowEvents: nowEvents, next: next)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
-    private func selectedDaySection(now: Date, hasPast: Bool, nowEvents: [CalendarEvent], next: [CalendarEvent]) -> some View {
+    private func selectedDaySection(now: Date, hasPast: Bool, allDayEvents: [CalendarEvent], nowEvents: [CalendarEvent], next: [CalendarEvent]) -> some View {
         // The settings gear lives in the first visible section header; it lands here only
-        // when there is no Past / Now / Next section above.
-        let showsAddButton = !hasPast && nowEvents.isEmpty && next.isEmpty
+        // when there is no Past / All Day / Now / Next section above.
+        let showsAddButton = !hasPast && allDayEvents.isEmpty && nowEvents.isEmpty && next.isEmpty
         if isTodaySelected {
             let remaining = remainingPanelEvents(now: now)
             if !remaining.isEmpty {
@@ -280,6 +288,22 @@ struct EventListView: View {
                 addButton
             }
             eventRow(event, showDivider: false, mode: .past)
+        }
+    }
+
+    private func allDaySection(_ events: [CalendarEvent], showsAddButton: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("All Day")
+                    .font(.headline)
+                Spacer()
+                if showsAddButton {
+                    addButton
+                }
+            }
+            ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                eventRow(event, showDivider: index < events.count - 1, mode: .allDay)
+            }
         }
     }
 
@@ -607,6 +631,8 @@ struct EventListView: View {
             return "ends in \(singleUnitCountdown(for: event.endDate, now: now))"
         case .past:
             return agoText(for: event.endDate, now: now)
+        case .allDay:
+            return ""
         }
     }
 
@@ -721,10 +747,11 @@ struct EventListView: View {
         case .next:
             return nextStartAndDuration(event)
         case .now:
-            if event.isAllDay { return "all day" }
             return "\(CountdownFormatter.durationText(event.endDate.timeIntervalSince(now))) left"
         case .past:
             return event.isAllDay ? "all day" : Self.timeFormatter.string(from: event.endDate)
+        case .allDay:
+            return "all day"
         case .upcoming:
             let start = formattedStart(event.startDate)
             // An all-day event's length is the day itself, so the bracket would add nothing.
