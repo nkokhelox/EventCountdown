@@ -20,7 +20,6 @@ struct EventListView: View {
     // The day chosen in the calendar. Reset to today every time the panel appears.
     @State private var pickerDate = Date()
 
-    private static let defaultExpandedDayCount = 2
     private static let contentHorizontalPadding: CGFloat = 12
 
     // The selected day, normalized to midnight. `isTodaySelected` drives whether the panel
@@ -104,6 +103,9 @@ struct EventListView: View {
             applyDefaultDayCollapse()
         }
         .onChange(of: eventDays) { _, _ in
+            applyDefaultDayCollapse()
+        }
+        .onChange(of: appModel.expandedDayCount) { _, _ in
             applyDefaultDayCollapse()
         }
     }
@@ -458,7 +460,7 @@ struct EventListView: View {
     }
 
     private func applyDefaultDayCollapse() {
-        collapsedDayIDs = Set(eventDays.dropFirst(Self.defaultExpandedDayCount))
+        collapsedDayIDs = Set(eventDays.dropFirst(appModel.expandedDayCount))
     }
 
     private func daySection(_ group: DayEventGroup) -> some View {

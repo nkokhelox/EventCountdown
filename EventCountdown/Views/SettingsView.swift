@@ -114,6 +114,20 @@ struct SettingsView: View {
                     }
 
                     eventsSubgroup(
+                        "Days expanded in Upcoming",
+                        description: "How many day-groups in the Upcoming list start expanded when the panel opens; the rest start collapsed. From 1 (today only) to 7."
+                    ) {
+                        Stepper(
+                            "\(appModel.expandedDayCount) day\(appModel.expandedDayCount == 1 ? "" : "s")",
+                            value: Binding(
+                                get: { appModel.expandedDayCount },
+                                set: { appModel.expandedDayCount = $0 }
+                            ),
+                            in: AppConstants.minExpandedDayCount...AppConstants.maxExpandedDayCount
+                        )
+                    }
+
+                    eventsSubgroup(
                         "Move to Next section",
                         description: "The soonest event moves out of Upcoming into its own Next section once its start is within this window. Never keeps everything in Upcoming (no Next section)."
                     ) {
