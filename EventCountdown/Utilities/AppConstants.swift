@@ -8,6 +8,10 @@ enum AppConstants {
     static let ackNowDisplaySeconds: TimeInterval = 60
     static let defaultPastEventWindowHours = 2
     static let defaultNextEventWindowHours = 2
+    // How many day-groups in the panel's Upcoming list start expanded (the rest collapse).
+    static let defaultExpandedDayCount = 2
+    static let minExpandedDayCount = 1
+    static let maxExpandedDayCount = 7
     static let displayEventCount = 5
     static let panelHorizonDays = 7
     // When the horizon window has no events, fall back to any upcoming events across up
@@ -21,6 +25,7 @@ enum AppConstants {
     static let openCalendarClickModeKey = "openCalendarClickMode"
     static let pastEventWindowHoursKey = "pastEventWindowHours"
     static let nextEventWindowHoursKey = "nextEventWindowHours"
+    static let expandedDayCountKey = "expandedDayCount"
     static let launchAtLoginKey = "launchAtLoginEnabled"
     static let enabledCalendarIDsKey = "enabledCalendarIDs"
     static let emojiRulesKey = "emojiRules"

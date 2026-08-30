@@ -34,6 +34,19 @@ final class AppModel {
         didSet { UserDefaults.standard.set(nextEventWindowHours, forKey: AppConstants.nextEventWindowHoursKey) }
     }
 
+    // How many day-groups in the panel's Upcoming list start expanded by default; the rest
+    // start collapsed. Clamped to 1 (today only) through 7.
+    var expandedDayCount: Int {
+        didSet {
+            let clamped = min(max(expandedDayCount, AppConstants.minExpandedDayCount), AppConstants.maxExpandedDayCount)
+            if clamped != expandedDayCount {
+                expandedDayCount = clamped
+                return
+            }
+            UserDefaults.standard.set(expandedDayCount, forKey: AppConstants.expandedDayCountKey)
+        }
+    }
+
     init() {
         emojiStore = EmojiMappingStore()
         launchAtLoginService = LaunchAtLoginService()
@@ -57,6 +70,11 @@ final class AppModel {
             nextEventWindowHours = AppConstants.defaultNextEventWindowHours
         } else {
             nextEventWindowHours = UserDefaults.standard.integer(forKey: AppConstants.nextEventWindowHoursKey)
+        }
+        if let stored = UserDefaults.standard.object(forKey: AppConstants.expandedDayCountKey) as? Int {
+            expandedDayCount = min(max(stored, AppConstants.minExpandedDayCount), AppConstants.maxExpandedDayCount)
+        } else {
+            expandedDayCount = AppConstants.defaultExpandedDayCount
         }
 
         calendarService = CalendarService()

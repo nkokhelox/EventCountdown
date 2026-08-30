@@ -76,6 +76,7 @@ struct MenuBarLabelView: View {
     }
 
     private func ongoingText(for event: CalendarEvent) -> String {
+        if event.isAllDay { return "All day" }
         let elapsed = appModel.tick.timeIntervalSince(event.startDate)
         return CountdownFormatter.ongoingLabel(elapsedSinceStart: elapsed)
     }
